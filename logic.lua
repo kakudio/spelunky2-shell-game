@@ -3,7 +3,7 @@
 -- validator can be exercised from the in-game console and reviewed in isolation.
 
 local M = {}
-M.LOGIC_VERSION = 12
+M.LOGIC_VERSION = 13
 
 M.LOCATIONS = {
     LOCATION_DWELLING = { parents = {} },
@@ -142,11 +142,11 @@ local function rng(seed)
         return (state % max) + 1
     end
 end
--- Kali's Present is a runtime source rather than a shuffled reward. Its
--- check still participates in key placement, so give it a seed-stable group
--- and use that same group when selecting a legal reward location.
-function M.kali_present_target_group(seed)
-    return rng((math.floor(tonumber(seed) or 1) + 918273) % 2147483647)(6)
+-- Kali's Present is a runtime source rather than a shuffled reward. It is
+-- offered at the first eligible altar level in play, while group 2 keeps its
+-- shuffled reward out of the initial Dwelling placement window.
+function M.kali_present_target_group(_seed)
+    return 2
 end
 function M.check_group(check_id, seed)
     if check_id=="CHECK_KALI_PRESENT" then return M.kali_present_target_group(seed) end

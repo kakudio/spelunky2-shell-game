@@ -9,14 +9,36 @@ local M={}
 -- bypass the base-game purchase gate.
 local DELIVERY_POLICIES={REWARD_EGGPLANT="player_hand"}
 
+local function closest_player(x,y,layer)
+    local best,best_x,best_y,best_layer,best_distance=nil,nil,nil,nil,math.huge
+    for _,player in ipairs(players or {}) do
+        local player_x,player_y,player_layer=get_position(player.uid)
+        -- Prefer the trigger's layer. A different-layer player is only a
+        -- fallback when no active player shares the reward's layer.
+        local layer_penalty=player_layer==layer and 0 or 1000000
+        local distance=layer_penalty+math.abs(player_x-x)+math.abs(player_y-y)
+        if distance<best_distance then
+            best,best_x,best_y,best_layer,best_distance=player,player_x,player_y,player_layer,distance
+        end
+    end
+    return best,best_x,best_y,best_layer
+end
 local function prepare_delivery(reward, x, y, layer, safe_delivery)
     if safe_delivery==false or DELIVERY_POLICIES[reward]~="player_hand" then return x,y,layer,nil end
-    local player=players and players[1] or nil
+    local player,player_x,player_y,player_layer=closest_player(x,y,layer)
     if not player then return x,y,layer,nil end
-    return player.x,player.y,player.layer,player
+    return player_x,player_y,player_layer,player
 end
 local function finish_delivery(ctx, reward, player, uid, check)
     if DELIVERY_POLICIES[reward]=="player_hand" and player and uid then
+        -- `pick_up` expects an empty pair of hands. Explicitly drop a held
+        -- weapon/tool first (for example Excalibur) so Eggplant delivery does
+        -- not corrupt the player's held-item state.
+        local held=player:get_held_entity()
+        if held then
+            drop(player.uid,held.uid)
+            ctx.log("Dropped held item uid "..held.uid.." before delivering "..reward.." for "..check)
+        end
         pick_up(player.uid,uid)
         ctx.log("Safely delivered "..reward.." for "..check.." to player uid "..player.uid)
     end

@@ -33,6 +33,7 @@ function M.reset_level(ctx)
     ctx.pending_anubis_scepter_drop=nil
     ctx.pending_anubis2_drop=nil
     ctx.pending_humphead_present=nil
+    ctx.pending_kali_present_payload=nil
     ctx.spawn_replacements={}
     ctx.moon_handoff_spawning=false
 end
@@ -51,6 +52,7 @@ function M.reset_run(ctx)
     ctx.kali_present_source_seen=false
     ctx.kali_present_source_location=nil
     ctx.pending_humphead_present=nil
+    ctx.pending_kali_present_payload=nil
 end
 
 function M.save_data(ctx)

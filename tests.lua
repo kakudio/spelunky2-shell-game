@@ -29,8 +29,8 @@ local function mapping_tests()
         local first=logic.generate(seed)
         local second=logic.generate(seed)
         local kali_group=logic.kali_present_target_group(seed)
-        if kali_group<1 or kali_group>6 or kali_group~=logic.kali_present_target_group(seed) then
-            return false,"invalid or nondeterministic Kali Present group at seed "..seed
+        if kali_group~=2 then
+            return false,"Kali Present must remain in logic group 2 at seed "..seed
         end
         local seen,count={},0
         for check_id,reward in pairs(first) do

@@ -162,12 +162,68 @@ local function nearest_kali_altar(x,y,layer)
     end
     return best
 end
+local function scan_kali_present_eggplants(ctx, pending, attempt)
+    set_timeout(function()
+        if ctx.pending_kali_present_payload~=pending then return end
+        local eggplant_type=placements.type_of("ITEM_EGGPLANT")
+        local found=false
+        for _,uid in ipairs(eggplant_type and get_entities_by_type(eggplant_type) or {}) do
+            if not pending.existing_eggplants[uid] then
+                local eggplant=get_entity(uid)
+                if eggplant and eggplant.layer==pending.layer and math.abs(eggplant.x-pending.x)+math.abs(eggplant.y-pending.y)<=5 then
+                    found=true
+                    ctx.log(string.format("Kali Present scan found new Eggplant uid %d at %.1f, %.1f layer %s after %d frame(s)",uid,eggplant.x,eggplant.y,tostring(eggplant.layer),attempt))
+                    -- Kali creates this Eggplant outside the generic entity
+                    -- spawn callback. Now that its exact uid and coordinates
+                    -- are known, replace this one native item in place.
+                    local replacement_uid=materialize(ctx,"CHECK_KALI_PRESENT",eggplant.x,eggplant.y,eggplant.layer,uid,false)
+                    if replacement_uid then
+                        ctx.kali_present_completed=true
+                        ctx.log("Kali Present Eggplant uid "..uid.." replaced in place with mapped reward uid "..replacement_uid)
+                    end
+                    break
+                end
+            end
+        end
+        if found or attempt>=10 then
+            if not found then ctx.log("Kali Present scan found no new Eggplant or native item spawn after 10 frames") end
+            -- End this short, source-scoped diagnostic window; later ordinary
+            -- Eggplants must remain untouched.
+            ctx.pending_kali_present_payload=nil
+            ctx.kali_present_sacrifice_pending=false
+            return
+        end
+        scan_kali_present_eggplants(ctx,pending,attempt+1)
+    end,1)
+end
+local function kali_present_shop_owner(pet)
+    if not is_inside_active_shop_room or not is_inside_active_shop_room(pet.x,pet.y,pet.layer) then return nil end
+    local owner_type=placements.type_of("MONS_SHOPKEEPER")
+    local best,best_distance=nil,math.huge
+    for _,uid in ipairs(owner_type and get_entities_by_type(owner_type) or {}) do
+        local owner=get_entity(uid)
+        if owner and owner.layer==pet.layer and is_inside_active_shop_room(owner.x,owner.y,owner.layer) then
+            local distance=math.abs(owner.x-pet.x)+math.abs(owner.y-pet.y)
+            if distance<best_distance then best,best_distance=owner,distance end
+        end
+    end
+    return best
+end
 local function place_kali_present_source(ctx)
-    if ctx.kali_present_source_placed or ctx.kali_present_completed then return end
-    local target_group=logic.kali_present_target_group(ctx.randomizer_state.seed)
+    if ctx.kali_present_completed then return end
     local world=state.world or 0
-    local current_group=world<=1 and 1 or world<=3 and 2 or world<=4 and 3 or world==5 and 4 or world==6 and 5 or 6
-    if current_group<target_group then return end
+    -- A source from a save/load of this same level is still valid. A stale UID
+    -- from a prior level is discarded, allowing the next altar level to offer
+    -- a fresh Present until this check has actually been collected.
+    if ctx.kali_present_source_placed then
+        local source=ctx.kali_present_source_location
+        local same_level=source and source.world==world and source.level==state.level and source.theme==state.theme
+        local existing=same_level and ctx.kali_present_source_uid and get_entity(ctx.kali_present_source_uid) or nil
+        if existing and existing.type.id==placements.type_of("ITEM_PRESENT") then return end
+        ctx.kali_present_source_placed=false
+        ctx.kali_present_source_uid=nil
+        ctx.kali_present_source_location=nil
+    end
     local altar_type=placements.type_of("FLOOR_ALTAR")
     local present_type=placements.type_of("ITEM_PRESENT")
     if not altar_type or not present_type then
@@ -185,18 +241,52 @@ local function place_kali_present_source(ctx)
             local pet=get_entity(uid)
             if pet then
                 local x,y,layer=pet.x,pet.y,pet.layer
+                local shop_owner=kali_present_shop_owner(pet)
+                local pet_price=pet.price
                 local present_uid=spawn_entity_nonreplaceable(present_type,x,y,layer,0,0)
+                if shop_owner then
+                    local added,err=pcall(add_item_to_shop,present_uid,shop_owner.uid)
+                    if added then
+                        local shop_present=get_entity(present_uid)
+                        if shop_present and pet_price then shop_present.price=pet_price end
+                        ctx.log("Kali Present source is a shop item owned by Shopkeeper uid "..shop_owner.uid.." (price "..tostring(pet_price)..")")
+                    else
+                        ctx.log("Kali Present could not be added to Shopkeeper uid "..shop_owner.uid..": "..tostring(err))
+                    end
+                end
                 pet:destroy()
                 ctx.kali_present_source_placed=true
                 ctx.kali_present_source_uid=present_uid
                 ctx.kali_present_source_seen=false
                 ctx.kali_present_source_location={world=world,level=state.level,theme=state.theme,x=x,y=y,layer=layer}
-                ctx.log(string.format("Kali Present source: group %d target met at %d-%d; replaced %s uid %d with Present uid %s at %.1f, %.1f",target_group,world,state.level,pet_name,uid,tostring(present_uid),x,y))
+                local present=get_entity(present_uid)
+                if present then
+                    present:set_pre_destroy(function(self)
+                        if ctx.kali_present_completed or ctx.randomizer_state.level_materialized.CHECK_KALI_PRESENT then return end
+                        local altar=nearest_kali_altar(self.x,self.y,self.layer)
+                        if not altar or math.abs(self.x-altar.x)+math.abs(self.y-altar.y)>2 then
+                            ctx.log("Kali Present source uid "..self.uid.." was destroyed away from an altar")
+                            return
+                        end
+                        local existing_eggplants={}
+                        local eggplant_type=placements.type_of("ITEM_EGGPLANT")
+                        for _,eggplant_uid in ipairs(eggplant_type and get_entities_by_type(eggplant_type) or {}) do existing_eggplants[eggplant_uid]=true end
+                        local pending={x=self.x,y=self.y,layer=self.layer,source_uid=self.uid,existing_eggplants=existing_eggplants}
+                        ctx.pending_kali_present_payload=pending
+                        ctx.kali_present_sacrifice_pending=true
+                        ctx.kali_present_source_uid=nil
+                        ctx.log(string.format("Kali Present source uid %d destroyed at altar %.1f, %.1f; waiting for native payload at %.1f, %.1f layer %s",self.uid,altar.x,altar.y,self.x,self.y,tostring(self.layer)))
+                        scan_kali_present_eggplants(ctx,pending,1)
+                    end)
+                else
+                    ctx.log("Kali Present source uid "..tostring(present_uid).." could not be hooked for destruction")
+                end
+                ctx.log(string.format("Kali Present source: first eligible altar at %d-%d; replaced %s uid %d with Present uid %s at %.1f, %.1f",world,state.level,pet_name,uid,tostring(present_uid),x,y))
                 return
             end
         end
     end
-    ctx.log("Kali Present target group "..target_group.." has an altar but no pet; will try the next level")
+    ctx.log("Kali Present altar level has no pet; will try the next eligible level")
 end
 local function replace_first_kali_gift(ctx,existing_items)
     local player=players and players[1]
@@ -657,63 +747,17 @@ function M.register_spawn_hooks(ctx)
     -- gift is not a fixed drop type, so replace the newly generated item at
     -- the nearest altar one frame later. Kapala itself uses DROP.ALTAR_KAPALA.
     set_callback(function()
-        -- Kali does not produce a fixed native item when a Present is
-        -- sacrificed. Track presents that are sitting on an altar, then place
-        -- the mapped reward when that specific present is consumed.
-        local current_presents={}
+        -- This confirms the generated source exists before its pre-destroy
+        -- hook is expected to replace the native sacrifice payload.
         for _,uid in ipairs(present_type and get_entities_by_type(present_type) or {}) do
             local present=get_entity(uid)
             if present then
-                current_presents[uid]={x=present.x,y=present.y,layer=present.layer}
                 if uid==ctx.kali_present_source_uid and not ctx.kali_present_source_seen then
                     ctx.kali_present_source_seen=true
                     ctx.log("Kali Present source uid "..uid.." is now being tracked")
                 end
             end
         end
-        for uid,last in pairs(ctx.kali_presents or {}) do
-            if uid==ctx.kali_present_source_uid and not current_presents[uid] and not ctx.kali_present_completed and not ctx.randomizer_state.level_materialized.CHECK_KALI_PRESENT then
-                local altar=nearest_kali_altar(last.x,last.y,last.layer)
-                ctx.log("Kali Present source uid "..uid.." disappeared; checking for altar sacrifice")
-                if altar and math.abs(last.x-altar.x)+math.abs(last.y-altar.y)<=2 then
-                    local reward_x,reward_y,reward_layer=altar.x,altar.y,altar.layer
-                    -- Sacrificing a Present can also advance kali_gifts. Mark
-                    -- it before the reward spawns so the normal first-gift
-                    -- adapter cannot mistake this check's reward for Kali's
-                    -- separate altar-1 reward.
-                    ctx.kali_present_sacrifice_pending=true
-                    ctx.kali_present_source_uid=nil
-                    set_timeout(function()
-                        if not ctx.randomizer_state.level_materialized.CHECK_KALI_PRESENT then
-                            -- The altar tile is occupied geometry. Snapping a
-                            -- reward there can leave it hidden inside the
-                            -- altar, even though the spawn call succeeds.
-                            -- Place it on the sacrificing player's tile
-                            -- instead, without a floor snap.
-                            local player=players and players[1]
-                            local spawn_x,spawn_y,spawn_layer=reward_x,reward_y,reward_layer
-                            if player then
-                                -- Use the authoritative position API rather
-                                -- than Player.x/y, which can lag behind the
-                                -- collision position during altar handling.
-                                local player_x,player_y,player_layer=get_position(player.uid)
-                                if player_layer==reward_layer then spawn_x,spawn_y,spawn_layer=player_x,player_y,player_layer end
-                            end
-                            local reward_uid=materialize(ctx,"CHECK_KALI_PRESENT",spawn_x,spawn_y,spawn_layer,nil,false)
-                            if reward_uid then
-                                ctx.kali_present_completed=true
-                                ctx.log(string.format("Kali Present sacrifice detected (uid %d); reward spawned at %.1f, %.1f layer %s",uid,spawn_x,spawn_y,tostring(spawn_layer)))
-                            end
-                        end
-                        ctx.kali_present_sacrifice_pending=false
-                    end,4)
-                else
-                    ctx.log("Kali Present source disappeared away from an altar; check not awarded")
-                end
-            end
-        end
-        ctx.kali_presents=current_presents
-
         local gifts=state.kali_gifts or 0
         local current_items={}
         for _,uid in ipairs(get_entities_by(0,MASK.ITEM,LAYER.BOTH)) do current_items[uid]=true end
@@ -723,11 +767,11 @@ function M.register_spawn_hooks(ctx)
             return
         end
         if gifts>ctx.kali_last_gifts then
-            if ctx.kali_last_gifts<1 and gifts>=1 and not ctx.kali_present_sacrifice_pending then
+            if ctx.kali_last_gifts<1 and gifts>=1 and not ctx.kali_present_sacrifice_pending and not ctx.kali_present_completed then
                 local items_before=ctx.kali_known_items or {}
                 set_timeout(function() replace_first_kali_gift(ctx,items_before) end,1)
             elseif ctx.kali_last_gifts<1 and gifts>=1 then
-                ctx.log("Kali Present sacrifice advanced kali_gifts; preserving CHECK_KALI_PRESENT reward")
+                ctx.log("Kali normal gift occurred while the Present replacement was still pending; skipping this reward")
             end
             ctx.kali_last_gifts=gifts
         end
