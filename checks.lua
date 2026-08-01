@@ -176,7 +176,9 @@ local function scan_kali_present_eggplants(ctx, pending, attempt)
                     -- Kali creates this Eggplant outside the generic entity
                     -- spawn callback. Now that its exact uid and coordinates
                     -- are known, replace this one native item in place.
-                    local replacement_uid=materialize(ctx,"CHECK_KALI_PRESENT",eggplant.x,eggplant.y,eggplant.layer,uid,false)
+                    -- Kali already creates its Eggplant at a stable altar
+                    -- reward position, so preserve that anchor.
+                    local replacement_uid=materialize(ctx,"CHECK_KALI_PRESENT",eggplant.x,eggplant.y,eggplant.layer,uid,false,false)
                     if replacement_uid then
                         ctx.kali_present_completed=true
                         ctx.log("Kali Present Eggplant uid "..uid.." replaced in place with mapped reward uid "..replacement_uid)
@@ -304,7 +306,8 @@ local function replace_first_kali_gift(ctx,existing_items)
     if candidate then
         local expected=ctx.randomizer_state.mapping and ctx.randomizer_state.mapping.CHECK_KALI_ALTAR_1
         ctx.log(string.format("Kali first-gift candidate uid %d type %d at %.1f, %.1f; mapped reward %s",candidate.uid,candidate.type.id,candidate.x,candidate.y,tostring(expected)))
-        local replacement_uid=materialize(ctx,"CHECK_KALI_ALTAR_1",candidate.x,candidate.y,candidate.layer,candidate.uid,true)
+        -- Test the native altar gift position as a safe Eggplant anchor.
+        local replacement_uid=materialize(ctx,"CHECK_KALI_ALTAR_1",candidate.x,candidate.y,candidate.layer,candidate.uid,true,false)
         ctx.log("Kali first-gift replacement result uid "..tostring(replacement_uid))
     else
         ctx.log("Kali first-gift check found no generated reward item near altar")
@@ -727,7 +730,9 @@ function M.register_spawn_hooks(ctx)
             local present_uid=entity.uid
             local x,y,layer=entity.x,entity.y,entity.layer
             set_timeout(function()
-                materialize(ctx,"CHECK_HUMPHEAD",x,y,layer,present_uid,true)
+                -- Humphead's reward is contained underwater, which is a safe
+                -- anchor for Eggplant rather than a volatile death drop.
+                materialize(ctx,"CHECK_HUMPHEAD",x,y,layer,present_uid,true,false)
                 ctx.log("Humphead native Present replaced (uid "..present_uid..")")
             end,1)
         end,SPAWN_TYPE.ANY,MASK.ITEM,present_type)
