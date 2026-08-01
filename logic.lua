@@ -3,7 +3,7 @@
 -- validator can be exercised from the in-game console and reviewed in isolation.
 
 local M = {}
-M.LOGIC_VERSION = 17
+M.LOGIC_VERSION = 18
 
 M.LOCATIONS = {
     LOCATION_DWELLING = { parents = {} },
@@ -58,7 +58,7 @@ M.CHECKS = {
     { id="CHECK_SPARROW_VAULT", location="LOCATION_NEO_BABYLON", layer="BACKGROUND", base_reward="REWARD_PLAYER_BAG_ROPES" },
     { id="CHECK_TIAMAT", location="LOCATION_TIAMAT", layer="FOREGROUND", base_reward="NONE" },
     { id="CHECK_SUN_CHALLENGE", location="LOCATION_SUNKEN_CITY", layer="BACKGROUND", base_reward="REWARD_ARROW_OF_LIGHT" },
-    { id="CHECK_EGGPLANT_KING", location="LOCATION_EGGPLANT_WORLD", layer="FOREGROUND", base_reward="REWARD_EGGPLANT_CROWN" },
+    { id="CHECK_EGGPLANT_KING", location="LOCATION_EGGPLANT_WORLD", layer="FOREGROUND", all_of={"REWARD_EGGPLANT"}, base_reward="REWARD_EGGPLANT_CROWN" },
     { id="CHECK_SPARROW", location="LOCATION_NONE", layer="NONE", base_reward="REWARD_ROPE_PILE" },
     -- Humphead's present/reward is the eggplant-chain check. The game labels
     -- its native drop HUMPHEAD_HIREDHAND, but the randomized check is the
