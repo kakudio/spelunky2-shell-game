@@ -8,6 +8,16 @@ local M={}
 -- `safe_delivery=false` is used for shop slots, where immediate pickup would
 -- bypass the base-game purchase gate.
 local DELIVERY_POLICIES={REWARD_EGGPLANT="player_hand"}
+-- These checks place their reward in a stable room/challenge anchor. Eggplant
+-- can safely remain there; volatile death drops retain player-hand delivery.
+local SAFE_EGGPLANT_ANCHORS={
+    CHECK_UDJAT_CHEST=true, CHECK_YANG=true,
+    CHECK_MOON_CHALLENGE_JUNGLE=true, CHECK_MOON_CHALLENGE_VOLCANA=true,
+    CHECK_TUSK_DICE_HOUSE=true, CHECK_EXCALIBUR_STONE=true,
+    CHECK_STARS_CHALLENGE_TIDE_POOL=true, CHECK_STARS_CHALLENGE_TEMPLE=true,
+    CHECK_MOTHERSHIP_PLASMA_CANNON=true, CHECK_KALI_PRESENT=true,
+    CHECK_KALI_ALTAR_1=true, CHECK_HUMPHEAD=true,
+}
 
 local function closest_player(x,y,layer)
     local best,best_x,best_y,best_layer,best_distance=nil,nil,nil,nil,math.huge
@@ -23,8 +33,8 @@ local function closest_player(x,y,layer)
     end
     return best,best_x,best_y,best_layer
 end
-local function prepare_delivery(reward, x, y, layer, safe_delivery)
-    if safe_delivery==false or DELIVERY_POLICIES[reward]~="player_hand" then return x,y,layer,nil end
+local function prepare_delivery(reward, check, x, y, layer, safe_delivery)
+    if safe_delivery==false or DELIVERY_POLICIES[reward]~="player_hand" or SAFE_EGGPLANT_ANCHORS[check] then return x,y,layer,nil end
     local player,player_x,player_y,player_layer=closest_player(x,y,layer)
     if not player then return x,y,layer,nil end
     return player_x,player_y,player_layer,player
@@ -52,7 +62,7 @@ function M.materialize(ctx, check, x, y, layer, source_uid, snap, safe_delivery)
     end
     local reward=ctx.randomizer_state.mapping and ctx.randomizer_state.mapping[check]
     local delivery_player
-    x,y,layer,delivery_player=prepare_delivery(reward,x,y,layer,safe_delivery)
+    x,y,layer,delivery_player=prepare_delivery(reward,check,x,y,layer,safe_delivery)
     if delivery_player then snap=false end
     -- Spawn callbacks are synchronous. Mark this short window so a mapped
     -- reward (for example, a Clone Gun from Excalibur's stone) cannot be
@@ -75,7 +85,7 @@ function M.replace_native_spawn(ctx,check,reward,x,y,layer,safe_delivery)
     local _,ent_type=placements.reward_type(ctx.randomizer_state,check)
     if not ent_type then return nil end
     local delivery_player
-    x,y,layer,delivery_player=prepare_delivery(reward,x,y,layer,safe_delivery)
+    x,y,layer,delivery_player=prepare_delivery(reward,check,x,y,layer,safe_delivery)
     ctx.spawn_replacements[check]=true
     ctx.randomizer_state.level_materialized[check]=true
     ctx.log("CHECK "..check.." -> "..reward.." (native reward spawn hook)")
