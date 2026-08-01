@@ -3,7 +3,7 @@
 -- validator can be exercised from the in-game console and reviewed in isolation.
 
 local M = {}
-M.LOGIC_VERSION = 16
+M.LOGIC_VERSION = 17
 
 M.LOCATIONS = {
     LOCATION_DWELLING = { parents = {} },
@@ -46,8 +46,8 @@ M.CHECKS = {
     { id="CHECK_KINGU", location="LOCATION_ABZU", layer="FOREGROUND", all_of={"REWARD_EXCALIBUR"}, base_reward="REWARD_TABLET_OF_DESTINY" },
     { id="CHECK_ANUBIS_SCEPTER", location="LOCATION_TEMPLE", layer="FOREGROUND", base_reward="REWARD_SCEPTER" },
     { id="CHECK_ALIEN_COMPASS", location="LOCATION_TEMPLE", layer="BACKGROUND", all_of={"CHECK_VAN_HORSING_RESCUE","CHECK_VLAD"}, base_reward="REWARD_ALIEN_COMPASS" },
-    { id="CHECK_OSIRIS", location="LOCATION_DUAT", layer="BACKGROUND", base_reward="REWARD_TABLET_OF_DESTINY" },
-    { id="CHECK_ANUBIS_II", location="LOCATION_DUAT", layer="BACKGROUND", base_reward="REWARD_JETPACK" },
+    { id="CHECK_OSIRIS", location="LOCATION_DUAT", layer="BACKGROUND", all_of={"REWARD_SCEPTER","REWARD_ANKH"}, any_of={"REWARD_HEDJET","REWARD_CROWN"}, base_reward="REWARD_TABLET_OF_DESTINY" },
+    { id="CHECK_ANUBIS_II", location="LOCATION_DUAT", layer="BACKGROUND", all_of={"REWARD_SCEPTER","REWARD_ANKH"}, any_of={"REWARD_HEDJET","REWARD_CROWN"}, base_reward="REWARD_JETPACK" },
     { id="CHECK_STARS_CHALLENGE_TIDE_POOL", location="LOCATION_TIDE_POOL", layer="BACKGROUND", any_of={"REWARD_CAPE","REWARD_VLADS_CAPE","REWARD_JETPACK"}, base_reward="REWARD_CLONE_GUN" },
     { id="CHECK_STARS_CHALLENGE_TEMPLE", location="LOCATION_TEMPLE", layer="BACKGROUND", any_of={"REWARD_CAPE","REWARD_VLADS_CAPE","REWARD_JETPACK"}, base_reward="REWARD_ELIXIR" },
     { id="CHECK_YETI_QUEEN", location="LOCATION_ICE_CAVES", layer="BACKGROUND", base_reward="REWARD_SPIKE_SHOES" },
@@ -128,6 +128,21 @@ local function has_any(state, values)
     for _, v in ipairs(values) do if state[v] then return true end end
     return false
 end
+local function contains(values, wanted)
+    for _,value in ipairs(values or {}) do if value==wanted then return true end end
+    return false
+end
+-- A check may explicitly repeat a requirement that its own location consumes
+-- on entry (Duat's Ankh, for example). It was required to reach the check,
+-- despite no longer being in inventory after the transition.
+local function has_check_all(inventory, check, entered)
+    local location=M.LOCATIONS[check.location or "LOCATION_NONE"]
+    for _,item in ipairs(check.all_of or {}) do
+        local consumed_by_its_location=location and entered[check.location] and contains(location.consumes,item) and (contains(location.all_of,item) or contains(location.any_of,item))
+        if not inventory[item] and not consumed_by_its_location then return false end
+    end
+    return true
+end
 local function copy(a) local b={} for k,v in pairs(a) do b[k]=v end return b end
 
 function M.check_count() return #M.CHECKS end
@@ -194,7 +209,7 @@ function M.solve(mapping, route)
             if not visited[check.id] then
                 local loc_ok = entered[check.location or "LOCATION_NONE"]
                 for _, loc in ipairs(check.locations or {}) do if not entered[loc] then loc_ok=false end end
-                if loc_ok and has_all(inventory, check.all_of) and has_any(inventory, check.any_of) then
+                if loc_ok and has_check_all(inventory, check, entered) and has_any(inventory, check.any_of) then
                     visited[check.id]=true; inventory[check.id]=true
                     local reward=mapping[check.id]
                     if reward then inventory[reward]=true end
