@@ -3,7 +3,7 @@
 -- validator can be exercised from the in-game console and reviewed in isolation.
 
 local M = {}
-M.LOGIC_VERSION = 22
+M.LOGIC_VERSION = 23
 
 M.LOCATIONS = {
     LOCATION_DWELLING = { parents = {} },
@@ -147,9 +147,9 @@ function M.derive_key_reward_deadlines()
         end
     end
     -- These are runtime/goal constraints rather than a normal check gate.
-    -- Eggplant must be safely available before Ice Caves. The Tablet is a
+    -- Eggplant must be safely available by group 4. The Tablet is a
     -- custom victory-path requirement, and the Bow/Arrow can be found late.
-    deadlines.REWARD_EGGPLANT=math.min(deadlines.REWARD_EGGPLANT or math.huge,3)
+    deadlines.REWARD_EGGPLANT=math.min(deadlines.REWARD_EGGPLANT or math.huge,4)
     deadlines.REWARD_TABLET_OF_DESTINY=6
     deadlines.REWARD_HOU_YIS_BOW=7
     deadlines.REWARD_ARROW_OF_LIGHT=7
