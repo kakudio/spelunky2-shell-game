@@ -3,7 +3,7 @@
 -- validator can be exercised from the in-game console and reviewed in isolation.
 
 local M = {}
-M.LOGIC_VERSION = 20
+M.LOGIC_VERSION = 21
 
 M.LOCATIONS = {
     LOCATION_DWELLING = { parents = {} },
@@ -150,6 +150,7 @@ function M.derive_key_reward_deadlines()
     -- Eggplant must be safely available before Ice Caves; the Bow and Arrow
     -- can legitimately be found in the final group before victory.
     deadlines.REWARD_EGGPLANT=math.min(deadlines.REWARD_EGGPLANT or math.huge,3)
+    deadlines.REWARD_TABLET_OF_DESTINY=6
     deadlines.REWARD_HOU_YIS_BOW=7
     deadlines.REWARD_ARROW_OF_LIGHT=7
     return deadlines
