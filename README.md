@@ -1,0 +1,171 @@
+# Key Item Randomizer - Spelunky 2
+
+A Spelunky 2 randomizer mod that shuffles key progression items to create unique paths to Hundun and Cosmic Ocean.
+
+## Current implementation
+
+The randomizer creates a deterministic, persisted `CHECK_ID -> REWARD_ID`
+mapping rather than taking items from a pool in entity-spawn order. Its
+randomizer seed is independent from the game's level seed.
+
+Runtime code is split by responsibility: `main.lua` manages lifecycle and
+console commands, `placements.lua` materializes mapped rewards, and `checks.lua`
+contains individual in-game check adapters.
+
+- `kir_validate [seed]` prints a validated Cosmic Ocean route.
+- `kir_fuzz [count] [first_seed]` checks determinism, one-to-one reward
+  assignment, and victory reachability across a seed range.
+- `kir_route [seed]` prints a selected victory trace.
+- `kir_anchors` reports unavailable Overlunky entity-name constants.
+
+See [the logic plan](docs/randomizer-logic-plan.md),
+[dry-run victory routes](docs/victory-routes.md), and the
+[implementation review checklist](docs/implementation-review.md). The review
+document identifies event-specific checks that require a live callback smoke
+test before a release build should enable them.
+
+## Overview
+
+This mod randomizes the locations of key progression items in Spelunky 2, forcing players to take different quest paths than normal to reach the final bosses and unlock Cosmic Ocean. Instead of the standard Ankh → City of Gold → Duat → Hundun path, you might find the Ankh in Tide Pool, the Crown in Volcana, or Excalibur in the Temple.
+
+## Key Items Randomized
+
+### Tier 1 (Early Game - Dwelling/Jungle/Volcana)
+- **Ankh** - Required for City of Gold, Duat, Hundun
+- **Crown** - Required for Excalibur, City of Gold, Kingu, Tiamat
+- **Hedjet** - Required for Excalibur, City of Gold
+- **Udjat Eye** - Required for Black Market, City of Gold
+- **Skeleton Key** - Opens locked doors, City of Gold door
+
+### Tier 2 (Mid Game - Olmec/Tide Pool/Temple/Ice Caves)
+- **Excalibur** - Required for Kingu, Tiamat (pulled from Excalibur Stone)
+- **Tablet of Destiny** - Required for Hundun fight
+- **Kapala** - Blood healing for sustainability
+
+### Tier 3 (Late Game - Neo Babylon/Sunken City/Duat/Abzu/Tiamat/Hundun)
+- **Elixir** - Critical for Hundun survival and Cosmic Ocean
+- **Arrow of Light** - Required for Hundun → Cosmic Ocean (from Sun Challenge)
+- **Hou Yi's Bow** - Required for Hundun → Cosmic Ocean (from Moon Challenge)
+
+## Progression Paths Created
+
+The randomizer can create paths like:
+
+1. **Classic Path**: Ankh (Dwelling) → Crown (Vlad) → Excalibur (Tide Pool) → Tablet (Duat) → Elixir/Arrow/Bow (Hundun)
+2. **Sunken City Rush**: Ankh (Black Market) → Hedjet (Jungle) → Excalibur (Temple) → Elixir (Sunken City) → Arrow/Bow (Challenges)
+3. **Volcana Route**: Crown (Vlad) → Ankh (Volcana) → Excalibur (Ice Caves) → Tablet (Olmec) → Elixir (Neo Babylon)
+4. **Mixed Paths**: Any combination based on seed
+
+## Installation
+
+### Prerequisites
+1. **Spelunky 2** (Steam version)
+2. **Modlunky 2** - [Download](https://github.com/spelunky-fyi/modlunky2/releases)
+3. **Playlunky** - Installed via Modlunky 2's "Playlunky" tab
+
+### Steps
+1. Open Modlunky 2
+2. Go to **Mods** tab → **Open Mods Folder**
+3. Create a new folder: `KeyItemRandomizer`
+4. Copy `main.lua` into this folder
+5. In Modlunky 2, go to **Playlunky** tab
+6. Find "KeyItemRandomizer" in the mod list and enable it
+7. Click **Play!** to launch Spelunky 2 with the mod
+
+## Configuration
+
+Access options via Modlunky 2's options menu or Overlunky (F8) → Options:
+
+| Option | Description |
+|--------|-------------|
+| **Enable Key Item Randomizer** | Master toggle |
+| **Shuffle Ankh** | Randomize Ankh location |
+| **Shuffle Crown/Hedjet** | Randomize Crown and Hedjet |
+| **Shuffle Excalibur** | Randomize Excalibur (replaces Excalibur Stone contents) |
+| **Shuffle Elixir** | Randomize Elixir |
+| **Shuffle Arrow of Light** | Randomize Arrow of Light (Sun Challenge reward) |
+| **Shuffle Hou Yi's Bow** | Randomize Hou Yi's Bow (Moon Challenge reward) |
+| **Shuffle Tablet of Destiny** | Randomize Tablet of Destiny |
+| **Shuffle Udjat Eye** | Randomize Udjat Eye |
+| **Shuffle Kapala** | Randomize Kapala |
+| **Shuffle Skeleton Key** | Randomize Skeleton Key |
+| **Logic Mode (Ensure Beatable)** | Validate seed is completable |
+| **Progressive Item Placement** | Tier-appropriate placement |
+| **Random Seed** | Set specific seed (0 = random) |
+| **Difficulty** | Easy/Normal/Hard/Expert presets |
+| **Generate Spoiler Log** | Print locations to console on start |
+| **Allow Duplicate Items** | Multiple copies for multiplayer |
+| **Replace Shop Items** | Key items can appear in shops |
+| **Replace Crate Contents** | Key items can spawn from crates |
+| **Replace Challenge Rewards** | Sun/Moon challenges give randomized items |
+| **Replace Kali Rewards** | Kali Altar rewards can be key items |
+
+## Gameplay Tips
+
+1. **Check Journal**: The journal will show discovered items as you find them
+2. **Explore Thoroughly**: Key items can be in unexpected places
+3. **Use Logic Mode**: Ensures you won't get stuck with unbeatable seeds
+4. **Spoiler Log**: Enable for debugging or race planning
+5. **Multiple Runs**: Same seed gives same item locations for practice
+
+## Compatibility
+
+- ✅ Works with Overlunky overlay
+- ✅ Compatible with most quality-of-life mods
+- ⚠️ May conflict with other randomizers (Dregu's Randomizer, etc.)
+- ⚠️ Requires Playlunky (DLL injection) for script mods
+
+## Technical Details
+
+### API Usage
+- Uses Overlunky/Playlunky Lua API (Lua 5.4 with Sol2)
+- Callbacks: `ON.PRE_ENTITY_SPAWN`, `ON.POST_ENTITY_SPAWN`, `ON.SAVE`, `ON.LOAD`
+- Entity manipulation: `get_entities_by`, `spawn_entity`, `kill_entity`
+- PRNG: Game's seeded random for deterministic results
+
+### Entity Types Used
+```lua
+ENT_TYPE.ITEM_PICKUP_ANKH
+ENT_TYPE.ITEM_PICKUP_CROWN
+ENT_TYPE.ITEM_PICKUP_HEDJET
+ENT_TYPE.ITEM_EXCALIBUR
+ENT_TYPE.FLOOR_EXCALIBUR_STONE
+ENT_TYPE.ITEM_PICKUP_ELIXIR
+ENT_TYPE.ITEM_ARROW_OF_LIGHT
+ENT_TYPE.ITEM_HOUYIS_BOW
+ENT_TYPE.ITEM_TABLET_OF_DESTINY
+ENT_TYPE.ITEM_PICKUP_UDJATEYE
+ENT_TYPE.ITEM_PICKUP_KAPALA
+ENT_TYPE.ITEM_PICKUP_SKELETON_KEY
+```
+
+## Building/Development
+
+To modify the mod:
+1. Edit `main.lua`
+2. Reload scripts in Overlunky (Ctrl+F5) or restart game
+3. Check console (`~`) for logs
+
+## Known Issues
+
+- Excalibur Stone replacement may occasionally spawn duplicate items
+- Logic validation is basic - some seeds may still be difficult
+- Multiplayer synchronization not tested
+- Some challenge rewards may not replace correctly in co-op
+
+## Credits
+
+- **Overlunky/Playlunky Team** - Modding framework
+- **Dregu** - Original Randomizer mod inspiration
+- **Spelunky.fyi Community** - Documentation and entity data
+- **Spelunky 2 Wiki** - Progression path documentation
+
+## License
+
+MIT License - Feel free to modify and distribute.
+
+## Support
+
+- Report issues on GitHub
+- Join [Spelunky Community Discord](https://discord.gg/spelunky-community) for help
+- Check [Spelunky.fyi](https://spelunky.fyi) for modding resources
