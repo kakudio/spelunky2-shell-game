@@ -224,12 +224,22 @@ local function shop_owner_at_item(item)
     end
     return best
 end
+local function native_shop_owner(item)
+    local owned_items=state.room_owners and state.room_owners.owned_items
+    local ownership=owned_items and owned_items[item.uid] or nil
+    local owner=ownership and ownership.owner_uid and get_entity(ownership.owner_uid) or nil
+    if owner then return owner end
+    return nil
+end
 local function replace_black_market_hedjet(ctx,attempt)
     if state.theme~=THEME.JUNGLE or ctx.randomizer_state.level_materialized.CHECK_BLACK_MARKET then return end
     local hedjet_type=placements.type_of("ITEM_PICKUP_HEDJET")
     for _,uid in ipairs(hedjet_type and get_entities_by_type(hedjet_type) or {}) do
         local hedjet=get_entity(uid)
-        local owner=hedjet and shop_owner_at_item(hedjet) or nil
+        -- The Black Market contains several shopkeepers. Use the Hedjet's
+        -- registered owner, not the nearest one, or the sale label can appear
+        -- without an actual purchase/steal relationship.
+        local owner=hedjet and native_shop_owner(hedjet) or nil
         if owner then
             local reward,reward_type=placements.reward_type(ctx.randomizer_state,"CHECK_BLACK_MARKET")
             if not reward_type then
@@ -249,14 +259,14 @@ local function replace_black_market_hedjet(ctx,attempt)
             if replacement and price then replacement.price=price end
             hedjet:destroy()
             ctx.randomizer_state.level_materialized.CHECK_BLACK_MARKET=true
-            ctx.log("CHECK CHECK_BLACK_MARKET -> "..reward.." as a purchasable Black Market item (price "..tostring(price)..")")
+            ctx.log("CHECK CHECK_BLACK_MARKET -> "..reward.." owned by native Shopkeeper uid "..owner.uid.." (price "..tostring(price)..")")
             return
         end
     end
     if attempt<20 then
         set_timeout(function() replace_black_market_hedjet(ctx,attempt+1) end,1)
     elseif hedjet_type then
-        ctx.log("Black Market Hedjet found no active shop owner after 20 frames; leaving native item unchanged")
+        ctx.log("Black Market Hedjet found no native ownership record after 20 frames; leaving native item unchanged")
     end
 end
 local function place_kali_present_source(ctx)
