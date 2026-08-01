@@ -44,7 +44,7 @@ local function finish_delivery(ctx, reward, player, uid, check)
     end
 end
 
-function M.materialize(ctx, check, x, y, layer, source_uid, snap)
+function M.materialize(ctx, check, x, y, layer, source_uid, snap, safe_delivery)
     local allowed,reason=policy.can_replace_source(source_uid,players or {},entity_has_item_uid)
     if not allowed then
         ctx.log("Ignored "..reason.." source uid "..source_uid.." for "..check)
@@ -52,7 +52,7 @@ function M.materialize(ctx, check, x, y, layer, source_uid, snap)
     end
     local reward=ctx.randomizer_state.mapping and ctx.randomizer_state.mapping[check]
     local delivery_player
-    x,y,layer,delivery_player=prepare_delivery(reward,x,y,layer,true)
+    x,y,layer,delivery_player=prepare_delivery(reward,x,y,layer,safe_delivery)
     if delivery_player then snap=false end
     -- Spawn callbacks are synchronous. Mark this short window so a mapped
     -- reward (for example, a Clone Gun from Excalibur's stone) cannot be

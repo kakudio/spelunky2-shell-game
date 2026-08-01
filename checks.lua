@@ -703,7 +703,10 @@ function M.register_spawn_hooks(ctx)
                 bow:remove()
                 ctx.moon_hidden_bows[bow_uid]=true
                 ctx.moon_handoff_spawning=true
-                materialize(ctx,check,x,y,layer,nil,false)
+                -- The Moon Challenge reward is safely contained in Tun's
+                -- challenge room. Keep an Eggplant at this native reward
+                -- position instead of forcing it into a player's hands.
+                materialize(ctx,check,x,y,layer,nil,false,false)
                 ctx.moon_handoff_spawning=false
                 ctx.log("Moon Challenge native Bow moved to limbo; mapped reward placed at its location (uid "..bow_uid..")")
             end,1)
