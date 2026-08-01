@@ -8,10 +8,9 @@ local materialize=adapters.materialize
 local replace_native_spawn=adapters.replace_native_spawn
 
 local ITEM_ANCHORS={
-    -- Black Market's Hedjet must be substituted at spawn so the game keeps it
-    -- as a shop item. Restrict that hook to an active shop room: Sparrow can
-    -- legitimately produce a Hedjet elsewhere in Jungle.
-    {source="ITEM_PICKUP_HEDJET",check="CHECK_BLACK_MARKET",theme=THEME.JUNGLE,shop_only=true,post_generation=false},
+    -- The Black Market Hedjet is handled once the shop room and its owner are
+    -- active, so its replacement remains a purchasable shop item.
+    {source="ITEM_PICKUP_HEDJET",check="CHECK_BLACK_MARKET",theme=THEME.JUNGLE,shop_only=true,pre_spawn=false,post_generation=false},
     -- The Crown is embedded in Vlad's Castle statue.  Replacing it before the
     -- room finishes initializing can leave certain items (notably Player Bag)
     -- inside the statue, so replace it after generation and snap to ground.
@@ -212,18 +211,53 @@ local function scan_kali_present_eggplants(ctx, pending, attempt)
         scan_kali_present_eggplants(ctx,pending,attempt+1)
     end,1)
 end
-local function kali_present_shop_owner(pet)
-    if not is_inside_active_shop_room or not is_inside_active_shop_room(pet.x,pet.y,pet.layer) then return nil end
+local function shop_owner_at_item(item)
+    if not is_inside_active_shop_room or not is_inside_active_shop_room(item.x,item.y,item.layer) then return nil end
     local owner_type=placements.type_of("MONS_SHOPKEEPER")
     local best,best_distance=nil,math.huge
     for _,uid in ipairs(owner_type and get_entities_by_type(owner_type) or {}) do
         local owner=get_entity(uid)
-        if owner and owner.layer==pet.layer and is_inside_active_shop_room(owner.x,owner.y,owner.layer) then
-            local distance=math.abs(owner.x-pet.x)+math.abs(owner.y-pet.y)
+        if owner and owner.layer==item.layer and is_inside_active_shop_room(owner.x,owner.y,owner.layer) then
+            local distance=math.abs(owner.x-item.x)+math.abs(owner.y-item.y)
             if distance<best_distance then best,best_distance=owner,distance end
         end
     end
     return best
+end
+local function replace_black_market_hedjet(ctx,attempt)
+    if state.theme~=THEME.JUNGLE or ctx.randomizer_state.level_materialized.CHECK_BLACK_MARKET then return end
+    local hedjet_type=placements.type_of("ITEM_PICKUP_HEDJET")
+    for _,uid in ipairs(hedjet_type and get_entities_by_type(hedjet_type) or {}) do
+        local hedjet=get_entity(uid)
+        local owner=hedjet and shop_owner_at_item(hedjet) or nil
+        if owner then
+            local reward,reward_type=placements.reward_type(ctx.randomizer_state,"CHECK_BLACK_MARKET")
+            if not reward_type then
+                ctx.log("Black Market Hedjet replacement has no entity for "..tostring(reward))
+                return
+            end
+            local price=hedjet.price
+            local replacement_uid=spawn_entity_nonreplaceable(reward_type,hedjet.x,hedjet.y,hedjet.layer,0,0)
+            local added,err=pcall(add_item_to_shop,replacement_uid,owner.uid)
+            if not added then
+                local replacement=get_entity(replacement_uid)
+                if replacement then replacement:destroy() end
+                ctx.log("Black Market replacement could not be registered as a shop item: "..tostring(err))
+                return
+            end
+            local replacement=get_entity(replacement_uid)
+            if replacement and price then replacement.price=price end
+            hedjet:destroy()
+            ctx.randomizer_state.level_materialized.CHECK_BLACK_MARKET=true
+            ctx.log("CHECK CHECK_BLACK_MARKET -> "..reward.." as a purchasable Black Market item (price "..tostring(price)..")")
+            return
+        end
+    end
+    if attempt<20 then
+        set_timeout(function() replace_black_market_hedjet(ctx,attempt+1) end,1)
+    elseif hedjet_type then
+        ctx.log("Black Market Hedjet found no active shop owner after 20 frames; leaving native item unchanged")
+    end
 end
 local function place_kali_present_source(ctx)
     if ctx.kali_present_completed then return end
@@ -257,7 +291,7 @@ local function place_kali_present_source(ctx)
             local pet=get_entity(uid)
             if pet then
                 local x,y,layer=pet.x,pet.y,pet.layer
-                local shop_owner=kali_present_shop_owner(pet)
+                local shop_owner=shop_owner_at_item(pet)
                 local pet_price=pet.price
                 local present_uid=spawn_entity_nonreplaceable(present_type,x,y,layer,0,0)
                 if shop_owner then
@@ -470,6 +504,7 @@ function M.on_post_level_generation(ctx)
     end
     replace_van_reward(ctx,items)
     replace_tusk_idol_room(ctx)
+    replace_black_market_hedjet(ctx,1)
     place_kali_present_source(ctx)
     if theme==THEME.TIDE_POOL then
         -- Delay beyond room construction; this also covers a Crown granted by
