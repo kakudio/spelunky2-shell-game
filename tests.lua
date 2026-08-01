@@ -29,8 +29,8 @@ local function mapping_tests()
         REWARD_UDJAT_EYE=1, REWARD_CROWN=2, REWARD_HEDJET=2,
         REWARD_SKELETON_KEY=2, REWARD_ANKH=3, REWARD_EXCALIBUR=3,
         REWARD_SCEPTER=3, REWARD_ALIEN_COMPASS=3, REWARD_EGGPLANT=3,
-        REWARD_TABLET_OF_DESTINY=4, REWARD_HOU_YIS_BOW=6,
-        REWARD_ARROW_OF_LIGHT=6,
+        REWARD_TABLET_OF_DESTINY=5, REWARD_HOU_YIS_BOW=7,
+        REWARD_ARROW_OF_LIGHT=7,
     }
     for reward,deadline in pairs(expected_deadlines) do
         if logic.KEY_REWARD_DEADLINES[reward]~=deadline then
