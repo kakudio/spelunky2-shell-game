@@ -170,7 +170,10 @@ local function scan_kali_present_eggplants(ctx, pending, attempt)
         for _,uid in ipairs(eggplant_type and get_entities_by_type(eggplant_type) or {}) do
             if not pending.existing_eggplants[uid] then
                 local eggplant=get_entity(uid)
-                if eggplant and eggplant.layer==pending.layer and math.abs(eggplant.x-pending.x)+math.abs(eggplant.y-pending.y)<=5 then
+                -- Only the payload created at this exact sacrifice position
+                -- belongs to this check. A wider scan can steal an unrelated
+                -- Eggplant reward that happened to spawn elsewhere nearby.
+                if eggplant and eggplant.layer==pending.layer and math.abs(eggplant.x-pending.x)<=1.25 and math.abs(eggplant.y-pending.y)<=1.25 then
                     found=true
                     ctx.log(string.format("Kali Present scan found new Eggplant uid %d at %.1f, %.1f layer %s after %d frame(s)",uid,eggplant.x,eggplant.y,tostring(eggplant.layer),attempt))
                     -- Kali creates this Eggplant outside the generic entity
@@ -188,7 +191,18 @@ local function scan_kali_present_eggplants(ctx, pending, attempt)
             end
         end
         if found or attempt>=10 then
-            if not found then ctx.log("Kali Present scan found no new Eggplant or native item spawn after 10 frames") end
+            if not found then
+                -- Some contexts (including a Moon Challenge carrying an
+                -- Eggplant reward) consume the Present without creating
+                -- Kali's native Eggplant payload. Award this check at a
+                -- stable, visible tile immediately above the altar instead.
+                ctx.log("Kali Present scan found no matching native Eggplant after 10 frames; spawning fallback above altar")
+                local fallback_uid=materialize(ctx,"CHECK_KALI_PRESENT",pending.altar_x,pending.altar_y+1,pending.layer,nil,false,false)
+                if fallback_uid then
+                    ctx.kali_present_completed=true
+                    ctx.log("Kali Present fallback reward spawned above altar with uid "..fallback_uid)
+                end
+            end
             -- End this short, source-scoped diagnostic window; later ordinary
             -- Eggplants must remain untouched.
             ctx.pending_kali_present_payload=nil
@@ -273,7 +287,7 @@ local function place_kali_present_source(ctx)
                         local existing_eggplants={}
                         local eggplant_type=placements.type_of("ITEM_EGGPLANT")
                         for _,eggplant_uid in ipairs(eggplant_type and get_entities_by_type(eggplant_type) or {}) do existing_eggplants[eggplant_uid]=true end
-                        local pending={x=self.x,y=self.y,layer=self.layer,source_uid=self.uid,existing_eggplants=existing_eggplants}
+                        local pending={x=self.x,y=self.y,layer=self.layer,altar_x=altar.x,altar_y=altar.y,source_uid=self.uid,existing_eggplants=existing_eggplants}
                         ctx.pending_kali_present_payload=pending
                         ctx.kali_present_sacrifice_pending=true
                         ctx.kali_present_source_uid=nil
