@@ -3,7 +3,7 @@
 -- validator can be exercised from the in-game console and reviewed in isolation.
 
 local M = {}
-M.LOGIC_VERSION = 18
+M.LOGIC_VERSION = 19
 
 M.LOCATIONS = {
     LOCATION_DWELLING = { parents = {} },
@@ -103,21 +103,58 @@ M.CHECK_GROUPS = {
     CHECK_TIAMAT=6, CHECK_SUN_CHALLENGE=6, CHECK_EGGPLANT_KING=6,
 }
 
--- Every entry here is guaranteed to appear. The number is its latest legal
--- group; a reward may be placed in any earlier compatible group.
-M.KEY_REWARD_DEADLINES = {
-    REWARD_UDJAT_EYE=1,
-    REWARD_CROWN=2, REWARD_HEDJET=2,
-    REWARD_ANKH=3, REWARD_EXCALIBUR=3, REWARD_SCEPTER=3,
-    REWARD_EGGPLANT=3,
-    REWARD_SKELETON_KEY=4, REWARD_ALIEN_COMPASS=4,
-    REWARD_TABLET_OF_DESTINY=5,
-    REWARD_HOU_YIS_BOW=6, REWARD_ARROW_OF_LIGHT=6,
-}
-
 -- Exactly one of these is selected per seed as the guaranteed early mobility
 -- reward for the Stars Challenge gate. The other two remain normal pool items.
 M.STARS_MOBILITY_REWARDS={"REWARD_CAPE","REWARD_VLADS_CAPE","REWARD_JETPACK"}
+
+local function is_stars_mobility_reward(value)
+    for _,mobility in ipairs(M.STARS_MOBILITY_REWARDS) do if value==mobility then return true end end
+    return false
+end
+
+local function add_group_requirement(deadlines, values, group)
+    -- A group summarizes what is needed to access its checks. A required item
+    -- must therefore be placed in an earlier group, while group 1 remains the
+    -- earliest possible placement window.
+    local deadline=math.max(1,group-1)
+    for _,value in ipairs(values or {}) do
+        -- The Stars gate needs any one mobility reward. Keep its existing
+        -- one-per-seed behavior rather than forcing all three early merely
+        -- because this summary takes a union of requirement alternatives.
+        if value:sub(1,7)=="REWARD_" and not is_stars_mobility_reward(value) and (not deadlines[value] or deadline<deadlines[value]) then
+            deadlines[value]=deadline
+        end
+    end
+end
+
+-- Derive progression deadlines from the union of each group's direct check
+-- requirements and that check's location gates. This leaves check-level logic
+-- authoritative while groups continue to define placement pacing.
+function M.derive_key_reward_deadlines()
+    local deadlines={}
+    for _,check in ipairs(M.CHECKS) do
+        local group=M.check_group(check.id,1)
+        add_group_requirement(deadlines,check.all_of,group)
+        add_group_requirement(deadlines,check.any_of,group)
+        local location_ids={}
+        if check.location then table.insert(location_ids,check.location) end
+        for _,location_id in ipairs(check.locations or {}) do table.insert(location_ids,location_id) end
+        for _,location_id in ipairs(location_ids) do
+            local location=M.LOCATIONS[location_id]
+            if location then
+                add_group_requirement(deadlines,location.all_of,group)
+                add_group_requirement(deadlines,location.any_of,group)
+            end
+        end
+    end
+    -- These are runtime/goal constraints rather than a normal check gate.
+    -- Eggplant must be safely available before Ice Caves; the Bow and Arrow
+    -- can legitimately be found in the final group before victory.
+    deadlines.REWARD_EGGPLANT=math.min(deadlines.REWARD_EGGPLANT or math.huge,3)
+    deadlines.REWARD_HOU_YIS_BOW=6
+    deadlines.REWARD_ARROW_OF_LIGHT=6
+    return deadlines
+end
 
 local function has_all(state, values)
     for _, v in ipairs(values or {}) do if not state[v] then return false end end
@@ -167,6 +204,9 @@ function M.check_group(check_id, seed)
     if check_id=="CHECK_KALI_PRESENT" then return M.kali_present_target_group(seed) end
     return M.CHECK_GROUPS[check_id]
 end
+-- Derived once from the definitions above; this is intentionally not a
+-- hand-maintained list of item-placement deadlines.
+M.KEY_REWARD_DEADLINES=M.derive_key_reward_deadlines()
 local function shuffled(values, next_int)
     local out={} for i,v in ipairs(values) do out[i]=v end
     for i=#out,2,-1 do local j=next_int(i); out[i],out[j]=out[j],out[i] end
@@ -261,7 +301,9 @@ function M.generate(seed)
     local keys={}
     for reward,deadline in pairs(M.KEY_REWARD_DEADLINES) do table.insert(keys,{reward=reward,deadline=deadline}) end
     local stars_mobility=M.STARS_MOBILITY_REWARDS[next_int(#M.STARS_MOBILITY_REWARDS)]
-    table.insert(keys,{reward=stars_mobility,deadline=3})
+    -- Stars is a group-3 gate, so its selected mobility reward must be in an
+    -- earlier placement group just like the rest of the derived requirements.
+    table.insert(keys,{reward=stars_mobility,deadline=2})
     table.sort(keys,function(a,b) return a.deadline<b.deadline or (a.deadline==b.deadline and a.reward<b.reward) end)
     for _=1,500 do
         local map, used_check, used_reward={}, {}, {}

@@ -25,6 +25,23 @@ local function policy_tests()
 end
 
 local function mapping_tests()
+    local expected_deadlines={
+        REWARD_UDJAT_EYE=1, REWARD_CROWN=2, REWARD_HEDJET=2,
+        REWARD_SKELETON_KEY=2, REWARD_ANKH=3, REWARD_EXCALIBUR=3,
+        REWARD_SCEPTER=3, REWARD_ALIEN_COMPASS=3, REWARD_EGGPLANT=3,
+        REWARD_TABLET_OF_DESTINY=4, REWARD_HOU_YIS_BOW=6,
+        REWARD_ARROW_OF_LIGHT=6,
+    }
+    for reward,deadline in pairs(expected_deadlines) do
+        if logic.KEY_REWARD_DEADLINES[reward]~=deadline then
+            return false,"wrong derived deadline for "..reward
+        end
+    end
+    for _,reward in ipairs(logic.STARS_MOBILITY_REWARDS) do
+        if logic.KEY_REWARD_DEADLINES[reward] then
+            return false,"Stars mobility should remain one-per-seed: "..reward
+        end
+    end
     for _,seed in ipairs({1,42,867530,999999}) do
         local first=logic.generate(seed)
         local second=logic.generate(seed)
