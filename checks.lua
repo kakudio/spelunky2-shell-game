@@ -189,6 +189,7 @@ local function place_kali_present_source(ctx)
                 pet:destroy()
                 ctx.kali_present_source_placed=true
                 ctx.kali_present_source_uid=present_uid
+                ctx.kali_present_source_seen=false
                 ctx.kali_present_source_location={world=world,level=state.level,theme=state.theme,x=x,y=y,layer=layer}
                 ctx.log(string.format("Kali Present source: group %d target met at %d-%d; replaced %s uid %d with Present uid %s at %.1f, %.1f",target_group,world,state.level,pet_name,uid,tostring(present_uid),x,y))
                 return
@@ -664,11 +665,16 @@ function M.register_spawn_hooks(ctx)
             local present=get_entity(uid)
             if present then
                 current_presents[uid]={x=present.x,y=present.y,layer=present.layer}
+                if uid==ctx.kali_present_source_uid and not ctx.kali_present_source_seen then
+                    ctx.kali_present_source_seen=true
+                    ctx.log("Kali Present source uid "..uid.." is now being tracked")
+                end
             end
         end
         for uid,last in pairs(ctx.kali_presents or {}) do
             if uid==ctx.kali_present_source_uid and not current_presents[uid] and not ctx.kali_present_completed and not ctx.randomizer_state.level_materialized.CHECK_KALI_PRESENT then
                 local altar=nearest_kali_altar(last.x,last.y,last.layer)
+                ctx.log("Kali Present source uid "..uid.." disappeared; checking for altar sacrifice")
                 if altar and math.abs(last.x-altar.x)+math.abs(last.y-altar.y)<=2 then
                     local reward_x,reward_y,reward_layer=altar.x,altar.y,altar.layer
                     -- Sacrificing a Present can also advance kali_gifts. Mark
@@ -677,21 +683,6 @@ function M.register_spawn_hooks(ctx)
                     -- separate altar-1 reward.
                     ctx.kali_present_sacrifice_pending=true
                     ctx.kali_present_source_uid=nil
-                    -- A generated Present can emit its own native Eggplant
-                    -- contents as it is consumed. Remove only that fragile
-                    -- native item near this altar before placing the mapped
-                    -- check reward; the actual mapped Eggplant, if any, is
-                    -- materialized later through the safe delivery policy.
-                    set_timeout(function()
-                        local eggplant_type=placements.type_of("ITEM_EGGPLANT")
-                        for _,eggplant_uid in ipairs(eggplant_type and get_entities_by_type(eggplant_type) or {}) do
-                            local eggplant=get_entity(eggplant_uid)
-                            if eggplant and eggplant.layer==reward_layer and math.abs(eggplant.x-reward_x)+math.abs(eggplant.y-reward_y)<=3 then
-                                eggplant:destroy()
-                                ctx.log("Removed native Eggplant content from Kali Present uid "..uid)
-                            end
-                        end
-                    end,2)
                     set_timeout(function()
                         if not ctx.randomizer_state.level_materialized.CHECK_KALI_PRESENT then
                             -- The altar tile is occupied geometry. Snapping a
@@ -701,8 +692,12 @@ function M.register_spawn_hooks(ctx)
                             -- instead, without a floor snap.
                             local player=players and players[1]
                             local spawn_x,spawn_y,spawn_layer=reward_x,reward_y,reward_layer
-                            if player and player.layer==reward_layer then
-                                spawn_x,spawn_y,spawn_layer=player.x,player.y,player.layer
+                            if player then
+                                -- Use the authoritative position API rather
+                                -- than Player.x/y, which can lag behind the
+                                -- collision position during altar handling.
+                                local player_x,player_y,player_layer=get_position(player.uid)
+                                if player_layer==reward_layer then spawn_x,spawn_y,spawn_layer=player_x,player_y,player_layer end
                             end
                             local reward_uid=materialize(ctx,"CHECK_KALI_PRESENT",spawn_x,spawn_y,spawn_layer,nil,false)
                             if reward_uid then
@@ -712,6 +707,8 @@ function M.register_spawn_hooks(ctx)
                         end
                         ctx.kali_present_sacrifice_pending=false
                     end,4)
+                else
+                    ctx.log("Kali Present source disappeared away from an altar; check not awarded")
                 end
             end
         end

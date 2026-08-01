@@ -16,7 +16,7 @@ function M.new(randomizer_state, initialize, log)
         pending_yeti_drops={}, spawn_replacements={}, moon_bows={}, moon_hidden_bows={},
         moon_handoff_spawning=false, kali_last_gifts=nil, kali_known_items={},
         kali_presents={}, kali_present_source_placed=false, kali_present_completed=false,
-        kali_present_sacrifice_pending=false, kali_present_source_uid=nil, kali_present_source_location=nil,
+        kali_present_sacrifice_pending=false, kali_present_source_uid=nil, kali_present_source_seen=false, kali_present_source_location=nil,
         drop_configured={}, humphead_drop_configured=false,
         progression={crown=false,hedjet=false,pending_gate_items={}},
         initialize=initialize, log=log,
@@ -48,6 +48,7 @@ function M.reset_run(ctx)
     ctx.kali_present_completed=false
     ctx.kali_present_sacrifice_pending=false
     ctx.kali_present_source_uid=nil
+    ctx.kali_present_source_seen=false
     ctx.kali_present_source_location=nil
     ctx.pending_humphead_present=nil
 end
