@@ -103,6 +103,10 @@ set_callback(function()
             local crown=spawn_entity_nonreplaceable(ENT_TYPE.ITEM_PICKUP_CROWN,player.x,player.y,player.layer,0,0)
             local skeleton_key=spawn_entity_nonreplaceable(ENT_TYPE.ITEM_PICKUP_SKELETON_KEY,player.x,player.y,player.layer,0,0)
             local alien_compass=spawn_entity_nonreplaceable(ENT_TYPE.ITEM_PICKUP_SPECIALCOMPASS,player.x,player.y,player.layer,0,0)
+            -- Scepter and Excalibur are both two-handed. Keep the Scepter
+            -- beside the player so test mode reliably provides both instead
+            -- of one pickup silently displacing the other.
+            local scepter=spawn_entity_nonreplaceable(ENT_TYPE.ITEM_SCEPTER,player.x+1,player.y,player.layer,0,0)
             local excalibur_type=placements.type_of("ITEM_EXCALIBUR")
             local vlads_cape_type=placements.type_of("ITEM_VLADS_CAPE")
             local excalibur=excalibur_type and spawn_entity_nonreplaceable(excalibur_type,player.x,player.y,player.layer,0,0) or nil
@@ -116,7 +120,7 @@ set_callback(function()
             if vlads_cape then pick_up(player.uid,vlads_cape) end
             runtime_context.progression.crown=true
         end
-        log("Test resources granted: $1,000,000, 50 health/bombs/ropes, Udjat Eye, Ankh, Crown, Skeleton Key, Alien Compass, Excalibur, and Vlad's Cape")
+        log("Test resources granted: $1,000,000, 50 health/bombs/ropes, Udjat Eye, Ankh, Crown, Skeleton Key, Alien Compass, Scepter, Excalibur, and Vlad's Cape")
     end
     checks.replace_excalibur_if_gated(runtime_context)
 end,ON.START)
