@@ -1,5 +1,6 @@
 # Generated install package
 KeyItemRandomizer.zip
+dist/
 
 # Per-install randomizer state
 randomizer_seed.txt

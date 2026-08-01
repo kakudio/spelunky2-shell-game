@@ -72,6 +72,8 @@ The randomizer can create paths like:
 6. Find "KeyItemRandomizer" in the mod list and enable it
 7. Click **Play!** to launch Spelunky 2 with the mod
 
+Release downloads are available from the [latest GitHub release](../../releases/latest). Extract the downloaded archive into a `KeyItemRandomizer` folder in Modlunky 2's **Mods** folder, then enable it in Playlunky.
+
 ## Configuration
 
 Access options via Modlunky 2's options menu or Overlunky (F8) → Options:
@@ -142,9 +144,20 @@ ENT_TYPE.ITEM_PICKUP_SKELETON_KEY
 ## Building/Development
 
 To modify the mod:
-1. Edit `main.lua`
-2. Reload scripts in Overlunky (Ctrl+F5) or restart game
-3. Check console (`~`) for logs
+1. Edit the mod files.
+2. Run `powershell -ExecutionPolicy Bypass -File .\scripts\package.ps1` to create `dist/KeyItemRandomizer-vX.Y.Z.zip`.
+3. Reload scripts in Overlunky (Ctrl+F5) or restart game, then check the console (`~`) for logs.
+
+## Releasing
+
+GitHub automatically packages the mod and publishes its zip when a version tag is pushed. Update `mod.json` first, commit it, then create and push a matching tag:
+
+```powershell
+git tag v0.1.0
+git push origin v0.1.0
+```
+
+The tag must exactly match the `version` in `mod.json` (for example, `0.1.0` requires `v0.1.0`). A manual run from the Actions page saves the zip as a downloadable workflow artifact without publishing a release.
 
 ## Known Issues
 
