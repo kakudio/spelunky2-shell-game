@@ -28,7 +28,6 @@ function M.reset_level(ctx)
     for _,name in ipairs(LEVEL_TABLES) do ctx[name]={} end
     ctx.pending_yeti_drops={}
     ctx.pending_quillback_drop=nil
-    ctx.pending_lahamu_drop=nil
     ctx.pending_eggplant_crown=nil
     ctx.pending_anubis_scepter_drop=nil
     ctx.pending_anubis2_drop=nil

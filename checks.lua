@@ -451,7 +451,7 @@ end
 -- let a narrowly scoped spawn hook replace its native drop when possible, and
 -- use a short fallback if that native event is not exposed by this game/API
 -- version. Only the source, check, and state keys vary.
-local function attach_delayed_death_reward(ctx, source, check, hook_field, pending_field, label, watch_destroy)
+local function attach_delayed_death_reward(ctx, source, check, hook_field, pending_field, label)
     local boss_type=placements.type_of(source)
     local hooks=ctx[hook_field]
     for _,uid in ipairs(boss_type and get_entities_by_type(boss_type) or {}) do
@@ -476,15 +476,17 @@ local function attach_delayed_death_reward(ctx, source, check, hook_field, pendi
             boss:set_pre_kill(function(self)
                 queue_reward(self,"pre-kill")
             end)
-            if watch_destroy then
-                boss:set_pre_destroy(function(self)
-                    -- Lahamu can be removed by its level logic without the
-                    -- normal kill callback. Only treat an already-dead entity
-                    -- as a reward event, so exiting the level does not grant it.
-                    if self.health and self.health<=0 then queue_reward(self,"pre-destroy") end
-                end)
-            end
             ctx.log("Attached "..label.." reward hook to uid "..uid)
+        end
+    end
+end
+local function observe_lahamu(ctx)
+    local lahamu_type=placements.type_of("MONS_LAHAMU")
+    for _,uid in ipairs(lahamu_type and get_entities_by_type(lahamu_type) or {}) do
+        local lahamu=get_entity(uid)
+        if lahamu and not ctx.lahamu_hooks[uid] then
+            ctx.lahamu_hooks[uid]={x=lahamu.x,y=lahamu.y,layer=lahamu.layer,queued=false}
+            ctx.log("Attached Lahamu entity watcher to uid "..uid)
         end
     end
 end
@@ -582,9 +584,9 @@ function M.on_post_level_generation(ctx)
         attach_yeti("MONS_YETIQUEEN","CHECK_YETI_QUEEN",placements.type_of("ITEM_PICKUP_SPIKESHOES"))
         attach_yeti("MONS_YETIKING","CHECK_YETI_KING",placements.type_of("ITEM_PICKUP_COMPASS"))
 
-        -- Preserve Lahamu's ordinary native reward. Her death is an additional
-        -- check, so place the mapped reward separately after that sequence.
-        attach_delayed_death_reward(ctx,"MONS_LAHAMU","CHECK_LAHAMU","lahamu_hooks","pending_lahamu_drop","Lahamu death",true)
+        -- Preserve Lahamu's ordinary native reward. Her removal path does not
+        -- reliably invoke normal kill callbacks, so track the entity itself.
+        observe_lahamu(ctx)
     end
     -- Humphead's DROP entry is a script-owned Hired Hand, so it cannot be
     -- substituted directly. Wait for its native Present and replace that
@@ -859,6 +861,27 @@ function M.register_spawn_hooks(ctx)
             ctx.kali_last_gifts=gifts
         end
         ctx.kali_known_items=current_items
+    end,ON.FRAME)
+
+    -- Lahamu may be removed by its level logic rather than a standard kill.
+    -- Watch the real entity each frame, retain its last known position, and
+    -- add the check reward only after it has died or disappeared.
+    set_callback(function()
+        if state.theme~=THEME.ICE_CAVES or ctx.randomizer_state.level_materialized.CHECK_LAHAMU then return end
+        for uid,watch in pairs(ctx.lahamu_hooks or {}) do
+            local lahamu=get_entity(uid)
+            if lahamu and (not lahamu.health or lahamu.health>0) then
+                watch.x,watch.y,watch.layer=lahamu.x,lahamu.y,lahamu.layer
+            elseif not watch.queued then
+                watch.queued=true
+                ctx.log(string.format("Lahamu uid %d %s; scheduling check reward at %.1f, %.1f layer %s",uid,lahamu and "reached zero health" or "disappeared",watch.x,watch.y,tostring(watch.layer)))
+                set_timeout(function()
+                    if state.theme~=THEME.ICE_CAVES or ctx.randomizer_state.level_materialized.CHECK_LAHAMU then return end
+                    local reward_uid=materialize(ctx,"CHECK_LAHAMU",watch.x,watch.y,watch.layer,nil,true)
+                    ctx.log("Lahamu watcher materialization result uid "..tostring(reward_uid))
+                end,2)
+            end
+        end
     end,ON.FRAME)
 end
 
