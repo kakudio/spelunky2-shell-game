@@ -102,6 +102,7 @@ set_callback(function()
             local ankh=spawn_entity_nonreplaceable(ENT_TYPE.ITEM_PICKUP_ANKH,player.x,player.y,player.layer,0,0)
             local crown=spawn_entity_nonreplaceable(ENT_TYPE.ITEM_PICKUP_CROWN,player.x,player.y,player.layer,0,0)
             local skeleton_key=spawn_entity_nonreplaceable(ENT_TYPE.ITEM_PICKUP_SKELETON_KEY,player.x,player.y,player.layer,0,0)
+            local alien_compass=spawn_entity_nonreplaceable(ENT_TYPE.ITEM_PICKUP_SPECIALCOMPASS,player.x,player.y,player.layer,0,0)
             local excalibur_type=placements.type_of("ITEM_EXCALIBUR")
             local vlads_cape_type=placements.type_of("ITEM_VLADS_CAPE")
             local excalibur=excalibur_type and spawn_entity_nonreplaceable(excalibur_type,player.x,player.y,player.layer,0,0) or nil
@@ -110,11 +111,12 @@ set_callback(function()
             pick_up(player.uid,ankh)
             pick_up(player.uid,crown)
             pick_up(player.uid,skeleton_key)
+            pick_up(player.uid,alien_compass)
             if excalibur then pick_up(player.uid,excalibur) end
             if vlads_cape then pick_up(player.uid,vlads_cape) end
             runtime_context.progression.crown=true
         end
-        log("Test resources granted: $1,000,000, 50 health/bombs/ropes, Udjat Eye, Ankh, Crown, Skeleton Key, Excalibur, and Vlad's Cape")
+        log("Test resources granted: $1,000,000, 50 health/bombs/ropes, Udjat Eye, Ankh, Crown, Skeleton Key, Alien Compass, Excalibur, and Vlad's Cape")
     end
     checks.replace_excalibur_if_gated(runtime_context)
 end,ON.START)
