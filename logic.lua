@@ -3,7 +3,7 @@
 -- validator can be exercised from the in-game console and reviewed in isolation.
 
 local M = {}
-M.LOGIC_VERSION = 21
+M.LOGIC_VERSION = 22
 
 M.LOCATIONS = {
     LOCATION_DWELLING = { parents = {} },
@@ -16,7 +16,7 @@ M.LOCATIONS = {
     LOCATION_CITY_OF_GOLD = { parents = { "LOCATION_TEMPLE" }, all_of = { "REWARD_SCEPTER" }, any_of = { "REWARD_HEDJET", "REWARD_CROWN" } },
     LOCATION_DUAT = { parents = { "LOCATION_CITY_OF_GOLD" }, all_of = { "REWARD_ANKH" }, consumes = { "REWARD_ANKH" } },
     LOCATION_ICE_CAVES = { parents = { "LOCATION_TIDE_POOL", "LOCATION_TEMPLE", "LOCATION_ABZU", "LOCATION_DUAT" } },
-    LOCATION_NEO_BABYLON = { parents = { "LOCATION_ICE_CAVES" }, all_of = { "REWARD_TABLET_OF_DESTINY" } },
+    LOCATION_NEO_BABYLON = { parents = { "LOCATION_ICE_CAVES" } },
     LOCATION_TIAMAT = { parents = { "LOCATION_NEO_BABYLON" } },
     LOCATION_SUNKEN_CITY = { parents = { "LOCATION_TIAMAT" } },
     -- Moai remains entirely vanilla. Eggplant is the shuffled gate required
@@ -147,8 +147,8 @@ function M.derive_key_reward_deadlines()
         end
     end
     -- These are runtime/goal constraints rather than a normal check gate.
-    -- Eggplant must be safely available before Ice Caves; the Bow and Arrow
-    -- can legitimately be found in the final group before victory.
+    -- Eggplant must be safely available before Ice Caves. The Tablet is a
+    -- custom victory-path requirement, and the Bow/Arrow can be found late.
     deadlines.REWARD_EGGPLANT=math.min(deadlines.REWARD_EGGPLANT or math.huge,3)
     deadlines.REWARD_TABLET_OF_DESTINY=6
     deadlines.REWARD_HOU_YIS_BOW=7
