@@ -441,23 +441,39 @@ end
 -- let a narrowly scoped spawn hook replace its native drop when possible, and
 -- use a short fallback if that native event is not exposed by this game/API
 -- version. Only the source, check, and state keys vary.
-local function attach_delayed_death_reward(ctx, source, check, hook_field, pending_field, label)
+local function attach_delayed_death_reward(ctx, source, check, hook_field, pending_field, label, watch_destroy)
     local boss_type=placements.type_of(source)
     local hooks=ctx[hook_field]
     for _,uid in ipairs(boss_type and get_entities_by_type(boss_type) or {}) do
         local boss=get_entity(uid)
         if boss and not hooks[uid] then
             hooks[uid]=true
-            boss:set_pre_kill(function(self)
+            local queued=false
+            local function queue_reward(self, trigger)
+                if queued then return end
+                queued=true
                 local pending={x=self.x,y=self.y,layer=self.layer}
                 ctx[pending_field]=pending
+                ctx.log(string.format("%s reward queued from %s at %.1f, %.1f layer %s",label,trigger,pending.x,pending.y,tostring(pending.layer)))
                 set_timeout(function()
                     if ctx[pending_field]==pending then
                         ctx[pending_field]=nil
-                        materialize(ctx,check,pending.x,pending.y,pending.layer,nil,true)
+                        local reward_uid=materialize(ctx,check,pending.x,pending.y,pending.layer,nil,true)
+                        ctx.log(label.." fallback materialization result uid "..tostring(reward_uid))
                     end
                 end,2)
+            end
+            boss:set_pre_kill(function(self)
+                queue_reward(self,"pre-kill")
             end)
+            if watch_destroy then
+                boss:set_pre_destroy(function(self)
+                    -- Lahamu can be removed by its level logic without the
+                    -- normal kill callback. Only treat an already-dead entity
+                    -- as a reward event, so exiting the level does not grant it.
+                    if self.health and self.health<=0 then queue_reward(self,"pre-destroy") end
+                end)
+            end
             ctx.log("Attached "..label.." reward hook to uid "..uid)
         end
     end
@@ -556,9 +572,9 @@ function M.on_post_level_generation(ctx)
         attach_yeti("MONS_YETIQUEEN","CHECK_YETI_QUEEN",placements.type_of("ITEM_PICKUP_SPIKESHOES"))
         attach_yeti("MONS_YETIKING","CHECK_YETI_KING",placements.type_of("ITEM_PICKUP_COMPASS"))
 
-        -- Lahamu has no ordinary item drop. Its death is the check, so place
-        -- the mapped reward at the death position after the native sequence.
-        attach_delayed_death_reward(ctx,"MONS_LAHAMU","CHECK_LAHAMU","lahamu_hooks","pending_lahamu_drop","Lahamu death")
+        -- Preserve Lahamu's ordinary native reward. Her death is an additional
+        -- check, so place the mapped reward separately after that sequence.
+        attach_delayed_death_reward(ctx,"MONS_LAHAMU","CHECK_LAHAMU","lahamu_hooks","pending_lahamu_drop","Lahamu death",true)
     end
     -- Humphead's DROP entry is a script-owned Hired Hand, so it cannot be
     -- substituted directly. Wait for its native Present and replace that
