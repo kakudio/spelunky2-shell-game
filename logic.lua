@@ -3,7 +3,7 @@
 -- validator can be exercised from the in-game console and reviewed in isolation.
 
 local M = {}
-M.LOGIC_VERSION = 23
+M.LOGIC_VERSION = 24
 
 M.LOCATIONS = {
     LOCATION_DWELLING = { parents = {} },
@@ -106,6 +106,13 @@ M.CHECK_GROUPS = {
 -- reward for the Stars Challenge gate. The other two remain normal pool items.
 M.STARS_MOBILITY_REWARDS={"REWARD_CAPE","REWARD_VLADS_CAPE","REWARD_JETPACK"}
 
+-- Taking the special Tusk Idol through any exit advances Sparrow into the
+-- second half of her quest. It must therefore appear after Sparrow's first
+-- encounter window (groups 1-2) but before the group-7 endgame checks.
+M.REWARD_PLACEMENT_WINDOWS={
+    REWARD_TUSK_IDOL={minimum_group=3, maximum_group=6},
+}
+
 local function is_stars_mobility_reward(value)
     for _,mobility in ipairs(M.STARS_MOBILITY_REWARDS) do if value==mobility then return true end end
     return false
@@ -148,9 +155,10 @@ function M.derive_key_reward_deadlines()
     end
     -- These are runtime/goal constraints rather than a normal check gate.
     -- Eggplant must be safely available by group 4. The Tablet is a
-    -- custom victory-path requirement, and the Bow/Arrow can be found late.
+    -- custom victory-path requirement available by group 5; Bow/Arrow can
+    -- be found late.
     deadlines.REWARD_EGGPLANT=math.min(deadlines.REWARD_EGGPLANT or math.huge,4)
-    deadlines.REWARD_TABLET_OF_DESTINY=6
+    deadlines.REWARD_TABLET_OF_DESTINY=5
     deadlines.REWARD_HOU_YIS_BOW=7
     deadlines.REWARD_ARROW_OF_LIGHT=7
     return deadlines
@@ -289,8 +297,9 @@ local function reward_is_requirement(check, reward)
     for _, value in ipairs(check.any_of or {}) do if value==reward then return true end end
     return false
 end
-local function compatible_check(check, reward, deadline, seed)
-    if (M.check_group(check.id,seed) or math.huge)>deadline then return false end
+local function compatible_check(check, reward, deadline, seed, minimum_group)
+    local group=M.check_group(check.id,seed) or math.huge
+    if group>deadline or group<(minimum_group or 1) then return false end
     return not reward_is_requirement(check,reward)
 end
 
@@ -304,6 +313,9 @@ function M.generate(seed)
     -- Stars is a group-3 gate, so its selected mobility reward must be in an
     -- earlier placement group just like the rest of the derived requirements.
     table.insert(keys,{reward=stars_mobility,deadline=2})
+    for reward,window in pairs(M.REWARD_PLACEMENT_WINDOWS) do
+        table.insert(keys,{reward=reward,deadline=window.maximum_group,minimum_group=window.minimum_group})
+    end
     table.sort(keys,function(a,b) return a.deadline<b.deadline or (a.deadline==b.deadline and a.reward<b.reward) end)
     for _=1,500 do
         local map, used_check, used_reward={}, {}, {}
@@ -311,7 +323,7 @@ function M.generate(seed)
         for _, key in ipairs(keys) do
             local candidates={}
             for _, check in ipairs(M.CHECKS) do
-                if check.shuffle~=false and not used_check[check.id] and compatible_check(check,key.reward,key.deadline,seed) then table.insert(candidates,check) end
+                if check.shuffle~=false and not used_check[check.id] and compatible_check(check,key.reward,key.deadline,seed,key.minimum_group) then table.insert(candidates,check) end
             end
             if #candidates==0 then placed=false break end
             local check=shuffled(candidates,next_int)[1]

@@ -20,9 +20,9 @@ $packageFiles = @(
     "placements.lua",
     "replacement_policy.lua",
     "adapters.lua",
+    "check_lifecycle.lua",
     "runtime_state.lua",
     "tests.lua",
-    "options.lua",
     "mod.json"
 )
 

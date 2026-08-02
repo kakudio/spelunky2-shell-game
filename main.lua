@@ -5,14 +5,53 @@ local placements=require "placements"
 local tests=require "tests"
 local runtime=require "runtime_state"
 
-register_option_bool("enabled","Enable Key Item Randomizer",true)
-register_option_int("seed","Randomizer Seed (0 = generate new layout)",0,0,999999)
-register_option_bool("test_resources","Test: Start with resources, progression items, and Excalibur",true)
-local options=options or {enabled=true,seed=0,test_resources=true}
+-- Option registration takes both a short label and a long description. Keep
+-- the default as the final argument; otherwise Playlunky treats it as the
+-- description and the option can be absent or unset in the overlay.
+register_option_bool("enabled","Enable Key Item Randomizer","Enable or disable all Key Item Randomizer replacements.",true)
+register_option_int("seed","Randomizer Seed (0 = generate new layout)","Choose a fixed layout seed. Set 0 to generate a new layout when the run starts.",0,0,999999)
+register_option_bool("test_resources","Test: Start with resources and progression items","Give each player the test loadout used for check verification.",true)
+register_option_bool("duat_item_recovery","Duat Item Recovery","Restore held, equipped, and altar-dropped player items consumed by the City of Gold to Duat transition at the special Duat altar.",true)
+local options=options or {enabled=true,seed=0,test_resources=true,duat_item_recovery=true}
 
 local randomizer_state={seed=0,mapping=nil,initialized=false,level_materialized={},saved_mapping_version=0}
 local runtime_context=nil
 local function log(message) print("[KeyItemRandomizer] "..message) end
+local function grant_test_item(player,entity_type,label)
+    if not entity_type or entity_has_item_type(player.uid,entity_type) then return false end
+    local uid=spawn_entity_nonreplaceable(entity_type,player.x,player.y,player.layer,0,0)
+    if uid then pick_up(player.uid,uid); log("Granted test "..label.." to player uid "..player.uid) end
+    return uid~=nil
+end
+local function grant_test_scepter(player)
+    local scepter_type=ENT_TYPE.ITEM_SCEPTER
+    if not scepter_type then return false end
+    -- ON.START can be observed more than once in some debug/start flows.
+    -- A nearby existing test Scepter makes this grant idempotent without
+    -- treating an unrelated Scepter elsewhere in the level as this loadout.
+    for _,uid in ipairs(get_entities_by_type(scepter_type) or {}) do
+        local scepter=get_entity(uid)
+        if scepter and scepter.layer==player.layer and math.abs(scepter.x-player.x)+math.abs(scepter.y-player.y)<=3 then return false end
+    end
+    local uid=spawn_entity_snapped_to_floor(scepter_type,player.x,player.y,player.layer)
+    if uid then log("Granted test Scepter at player uid "..player.uid.."'s position") end
+    return uid~=nil
+end
+local function grant_test_tusk_idol(player)
+    local idol_type=placements.type_of("ITEM_MADAMETUSK_IDOL")
+    if not idol_type then return false end
+    -- An Idol is a held item, so place it at the player's feet instead of
+    -- displacing the test Excalibur. Limit the duplicate check to the start
+    -- position, as other Idols in a level are unrelated.
+    for _,uid in ipairs(get_entities_by_type(idol_type) or {}) do
+        local idol=get_entity(uid)
+        if idol and idol.layer==player.layer and math.abs(idol.x-player.x)+math.abs(idol.y-player.y)<=3 then return false end
+    end
+    local uid=spawn_entity_snapped_to_floor(idol_type,player.x,player.y,player.layer)
+    if not uid then return false end
+    log("Granted test Tusk Idol at player uid "..player.uid.."'s position")
+    return true
+end
 local function now_seed() local value=math.floor(os.time()*1000)%999999; return value==0 and 1 or value end
 local function load_persisted_seed()
     local file=io.open_data("randomizer_seed.txt","r")
@@ -42,7 +81,7 @@ local function initialize()
     randomizer_state.saved_mapping_version=logic.LOGIC_VERSION
     log(string.format("Initialized logic v%d, randomizer seed %d (%d checks / %d rewards)",logic.LOGIC_VERSION,randomizer_state.seed,logic.check_count(),logic.reward_count()))
 end
-runtime_context=runtime.new(randomizer_state,initialize,log)
+runtime_context=runtime.new(randomizer_state,initialize,log,function() return options.duat_item_recovery end)
 set_callback(function()
     if not options.enabled then return end
     -- A menu edit is applied just before the next dungeon is generated. This
@@ -53,12 +92,16 @@ set_callback(function()
         randomizer_state.mapping=nil
     end
     initialize()
+    -- Spawn hooks can schedule deferred work while the level is generating.
+    -- Begin the new epoch before that work exists; doing this in POST level
+    -- generation cancelled valid callbacks such as Moon Challenge's Bow
+    -- handoff as soon as the level finished building.
+    runtime.reset_level(runtime_context)
     checks.on_pre_level_generation(runtime_context)
 end,ON.PRE_LEVEL_GENERATION)
 local function on_post_level_generation()
     if not options.enabled then return end
     initialize()
-    runtime.reset_level(runtime_context)
     checks.on_post_level_generation(runtime_context)
 end
 checks.register_spawn_hooks(runtime_context)
@@ -98,29 +141,21 @@ set_callback(function()
             player.inventory.money=1000000
             -- Do not route test inventory through the randomizer's native-spawn
             -- hooks (the Udjat hook would otherwise turn this Eye into its mapped reward).
-            local eye=spawn_entity_nonreplaceable(ENT_TYPE.ITEM_PICKUP_UDJATEYE,player.x,player.y,player.layer,0,0)
-            local ankh=spawn_entity_nonreplaceable(ENT_TYPE.ITEM_PICKUP_ANKH,player.x,player.y,player.layer,0,0)
-            local crown=spawn_entity_nonreplaceable(ENT_TYPE.ITEM_PICKUP_CROWN,player.x,player.y,player.layer,0,0)
-            local skeleton_key=spawn_entity_nonreplaceable(ENT_TYPE.ITEM_PICKUP_SKELETON_KEY,player.x,player.y,player.layer,0,0)
-            local alien_compass=spawn_entity_nonreplaceable(ENT_TYPE.ITEM_PICKUP_SPECIALCOMPASS,player.x,player.y,player.layer,0,0)
-            -- Scepter and Excalibur are both two-handed. Keep the Scepter
-            -- beside the player so test mode reliably provides both instead
-            -- of one pickup silently displacing the other.
-            local scepter=spawn_entity_nonreplaceable(ENT_TYPE.ITEM_SCEPTER,player.x+1,player.y,player.layer,0,0)
+            grant_test_item(player,ENT_TYPE.ITEM_PICKUP_UDJATEYE,"Udjat Eye")
+            grant_test_item(player,ENT_TYPE.ITEM_PICKUP_ANKH,"Ankh")
+            grant_test_item(player,ENT_TYPE.ITEM_PICKUP_CROWN,"Crown")
+            grant_test_item(player,ENT_TYPE.ITEM_PICKUP_SKELETON_KEY,"Skeleton Key")
+            grant_test_item(player,ENT_TYPE.ITEM_PICKUP_SPECIALCOMPASS,"Alien Compass")
+            grant_test_item(player,ENT_TYPE.ITEM_PICKUP_SPIKESHOES,"Spike Shoes")
             local excalibur_type=placements.type_of("ITEM_EXCALIBUR")
             local vlads_cape_type=placements.type_of("ITEM_VLADS_CAPE")
-            local excalibur=excalibur_type and spawn_entity_nonreplaceable(excalibur_type,player.x,player.y,player.layer,0,0) or nil
-            local vlads_cape=vlads_cape_type and spawn_entity_nonreplaceable(vlads_cape_type,player.x,player.y,player.layer,0,0) or nil
-            pick_up(player.uid,eye)
-            pick_up(player.uid,ankh)
-            pick_up(player.uid,crown)
-            pick_up(player.uid,skeleton_key)
-            pick_up(player.uid,alien_compass)
-            if excalibur then pick_up(player.uid,excalibur) end
-            if vlads_cape then pick_up(player.uid,vlads_cape) end
+            grant_test_item(player,excalibur_type,"Excalibur")
+            grant_test_item(player,vlads_cape_type,"Vlad's Cape")
+            grant_test_scepter(player)
+            grant_test_tusk_idol(player)
             runtime_context.progression.crown=true
         end
-        log("Test resources granted: $1,000,000, 50 health/bombs/ropes, Udjat Eye, Ankh, Crown, Skeleton Key, Alien Compass, Scepter, Excalibur, and Vlad's Cape")
+        log("Test resources granted: $1,000,000, 50 health/bombs/ropes, Udjat Eye, Ankh, Crown, Skeleton Key, Alien Compass, Spike Shoes, Excalibur, Vlad's Cape, and a Scepter and Tusk Idol at each player's position")
     end
     checks.replace_excalibur_if_gated(runtime_context)
 end,ON.START)
@@ -176,7 +211,15 @@ register_console_command("kir_spoiler",function()
     end
     return true
 end)
-register_console_command("kir_status",function() initialize(); print(string.format("[KIR] seed=%d logic=%d mapping=%s",randomizer_state.seed,logic.LOGIC_VERSION,randomizer_state.mapping and "ready" or "missing")); return true end)
+register_console_command("kir_status",function()
+    initialize()
+    local epoch,materialized,failed,failures=runtime_context.lifecycle:summary()
+    print(string.format("[KIR] seed=%d logic=%d mapping=%s level_epoch=%d materialized=%d failures=%d",randomizer_state.seed,logic.LOGIC_VERSION,randomizer_state.mapping and "ready" or "missing",epoch,materialized,failed))
+    local sparrow_state=state.quests and state.quests.sparrow_state
+    print(string.format("[KIR] Sparrow quest state=%s; last observed transition=%s",tostring(sparrow_state),runtime_context.sparrow_last_transition and (tostring(runtime_context.sparrow_last_transition.from).." -> "..tostring(runtime_context.sparrow_last_transition.to)) or "none"))
+    for check,detail in pairs(failures) do print("[KIR] FAILED "..check..": "..detail) end
+    return true
+end)
 register_console_command("kir_where",function()
     local player=players and players[1]
     if not player then print("[KIR] No player is active."); return false end
@@ -184,5 +227,5 @@ register_console_command("kir_where",function()
     print(string.format("[KIR] Player: x=%.1f y=%.1f layer=%s (%d), world=%d level=%d theme=%d",x,y,name,layer,state.world,state.level,state.theme)); return true
 end)
 register_console_command("kir_anchors",function() placements.print_missing_anchors(); return true end)
-register_console_command("kir_help",function() print("[KIR] kir_validate(seed), kir_fuzz(count, first), kir_seed(seed), kir_new_seed(), kir_spoiler(), kir_where(), kir_status(), kir_anchors()"); return true end)
+register_console_command("kir_help",function() print("[KIR] kir_validate(seed), kir_fuzz(count, first), kir_seed(seed), kir_new_seed(), kir_spoiler(), kir_where(), kir_status(), kir_anchors() -- kir_status includes Sparrow quest state"); return true end)
 log("Key Item Randomizer logic v"..logic.LOGIC_VERSION.." loaded")

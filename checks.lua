@@ -15,7 +15,6 @@ local ITEM_ANCHORS={
     -- room finishes initializing can leave certain items (notably Player Bag)
     -- inside the statue, so replace it after generation and snap to ground.
     {source="ITEM_PICKUP_CROWN",check="CHECK_VLADS_CASTLE",theme=THEME.VOLCANA,pre_spawn=false,snap=true,absolute=true,layer=LAYER.BACK},
-    {source="ITEM_VLADS_CAPE",check="CHECK_VLAD",theme=THEME.VOLCANA},
     {source="ITEM_PICKUP_ANKH",check="CHECK_OLMEC_ANKH",theme=THEME.OLMEC},
     -- Tide Pool 4-2 has a Golden Idol inside Great Humphead's cave. The
     -- level restriction keeps this distinct from Tusk's 4-1 Idol.
@@ -31,15 +30,15 @@ local ITEM_ANCHORS={
     {source="ITEM_PLASMACANNON",check="CHECK_MOTHERSHIP_PLASMA_CANNON",theme=THEME.ICE_CAVES,layer=LAYER.BACK,snap=true},
     -- Tusk's Palace Royal Jelly is a room object, while Sparrow's Player Bag
     -- is spawned only after the player completes her vault conversation.
-    -- The post-generation scan handles the former; the same tightly scoped
-    -- pre-spawn hook handles the latter at the moment Sparrow grants it.
+    -- The post-generation scan handles Royal Jelly. Sparrow's Player Bag is
+    -- handled after its special spawn routine finishes; replacing it during
+    -- pre-spawn makes the game apply a Player Bag character texture to the
+    -- mapped reward.
     -- Ordinary Royal Jelly and Player Bags remain untouched elsewhere.
     {source="ITEM_PICKUP_ROYALJELLY",check="CHECK_TUSK_PALACE_VISIT",theme=THEME.NEO_BABYLON,level=3,layer=LAYER.BACK,snap=true},
-    {source="ITEM_PICKUP_PLAYERBAG",check="CHECK_SPARROW_VAULT",theme=THEME.NEO_BABYLON,level=3,layer=LAYER.BACK,snap=true},
 }
 local NPC_ANCHORS={
     {source="MONS_YANG",check="CHECK_YANG",theme=THEME.DWELLING,layer=LAYER.BACK,snap=true},
-    {source="MONS_TIAMAT",check="CHECK_TIAMAT",theme=THEME.TIAMAT},
 }
 -- Fixed engine DROP substitutions share one lifecycle. Theme-scoped entries
 -- are cleared when leaving their theme; global quest entries remain armed but
@@ -48,6 +47,7 @@ local DROP_CONFIGS={
     {drop=DROP.KINGU_TABLETOFDESTINY,check="CHECK_KINGU",theme=THEME.ABZU,label="Kingu Tablet"},
     {drop=DROP.OLMEC_SISTERS_BOMBBOX,check="CHECK_SISTERS_OLMEC_REWARD",theme=THEME.OLMEC,label="Sisters Bomb Box"},
     {drop=DROP.OSIRIS_TABLETOFDESTINY,check="CHECK_OSIRIS",theme=THEME.DUAT,label="Osiris Tablet"},
+    {drop=DROP.ANUBIS2_JETPACK,check="CHECK_ANUBIS_II",theme=THEME.DUAT,label="Anubis II Jetpack"},
     {drop=DROP.VAN_HORSING_COMPASS,check="CHECK_ALIEN_COMPASS",theme=THEME.TEMPLE,label="Van Alien Compass"},
     {drop=DROP.SPARROW_ROPEPILE,check="CHECK_SPARROW",label="Sparrow Rope Pile"},
     {drop=DROP.BEG_BOMBBAG,check="CHECK_BEG_FIRST_MEETING",label="Beg Bomb Bag"},
@@ -77,7 +77,7 @@ local function remove_moon_arrows(ctx, bow, x, y, layer)
         if item and item.type.id==metal_arrow_type then item:destroy() end
     end
     -- Catch the separately spawned arrow after level generation has finished.
-    set_timeout(function()
+    ctx.defer(1,"moon-arrow cleanup",function()
         for _,uid in ipairs(get_entities_by_type(metal_arrow_type)) do
             local item=get_entity(uid)
             if item and item.layer==layer and math.abs(item.x-x)+math.abs(item.y-y)<=4 then
@@ -85,7 +85,7 @@ local function remove_moon_arrows(ctx, bow, x, y, layer)
                 ctx.log("Removed Moon Challenge metal arrow uid "..uid)
             end
         end
-    end,1)
+    end)
 end
 local function replace_van_reward(ctx, items)
     if state.theme~=THEME.VOLCANA or ctx.randomizer_state.level_materialized.CHECK_VAN_HORSING_RESCUE then return end
@@ -108,7 +108,9 @@ local function replace_van_reward(ctx, items)
     end
 end
 local function replace_tusk_idol_room(ctx)
-    if state.theme~=THEME.TIDE_POOL or ctx.randomizer_state.level_materialized.CHECK_TUSK_IDOL then return end
+    -- The Tusk Idol has its own entity type. Tide Pool 4-1 is its only
+    -- source, leaving Humphead's normal 4-2 Idol to its separate adapter.
+    if state.theme~=THEME.TIDE_POOL or state.level~=1 or ctx.randomizer_state.level_materialized.CHECK_TUSK_IDOL then return end
     local source_type=placements.type_of("ITEM_MADAMETUSK_IDOL")
     for _,uid in ipairs(source_type and get_entities_by_type(source_type) or {}) do
         local entity=get_entity(uid)
@@ -150,19 +152,183 @@ function M.on_pre_level_generation(ctx)
     configure_humphead_drop(ctx)
 end
 local function nearest_kali_altar(x,y,layer)
-    local altar_type=placements.type_of("FLOOR_ALTAR")
     local best,best_distance=nil,math.huge
-    for _,uid in ipairs(altar_type and get_entities_by_type(altar_type) or {}) do
-        local altar=get_entity(uid)
-        if altar and altar.layer==layer then
-            local distance=math.abs(altar.x-x)+math.abs(altar.y-y)
-            if distance<best_distance then best,best_distance=altar,distance end
+    for _,name in ipairs({"FLOOR_ALTAR","FLOOR_DUAT_ALTAR"}) do
+        local altar_type=placements.type_of(name)
+        for _,uid in ipairs(altar_type and get_entities_by_type(altar_type) or {}) do
+            local altar=get_entity(uid)
+            if altar and altar.layer==layer then
+                local distance=math.abs(altar.x-x)+math.abs(altar.y-y)
+                if distance<best_distance then best,best_distance=altar,distance end
+            end
         end
     end
     return best
 end
+local function duat_altar()
+    local altar_type=placements.type_of("FLOOR_DUAT_ALTAR")
+    local altar_uid=altar_type and get_entities_by_type(altar_type)[1] or nil
+    return altar_uid and get_entity(altar_uid) or nil
+end
+
+-- The Duat entrance consumes the Ankh and discards equipped/held items. Keep
+-- a current snapshot only while the player is in the City of Gold, then place
+-- fresh copies on Duat's Kali altar after the transition. Entity UIDs cannot
+-- survive the level change, so this intentionally restores item types rather
+-- than trying to preserve the destroyed entities themselves.
+local DUAT_BACK_ITEM_NAMES={
+    "ITEM_CAPE", "ITEM_VLADS_CAPE", "ITEM_JETPACK", "ITEM_HOVERPACK",
+    "ITEM_POWERPACK", "ITEM_TELEPORTER_BACKPACK",
+}
+-- Items that can plausibly have been dropped by the player at the City of
+-- Gold altar. Do not recover arbitrary MASK.ITEM entities: blood, leaves,
+-- pots, and room machinery share that mask and are not player equipment.
+local DUAT_NEAR_ALTAR_ITEM_NAMES={
+    "ITEM_EXCALIBUR", "ITEM_SCEPTER", "ITEM_HOUYIBOW", "ITEM_LIGHT_ARROW",
+    "ITEM_PLASMACANNON", "ITEM_CLONEGUN", "ITEM_TELEPORTER", "ITEM_MATTOCK",
+    "ITEM_SHOTGUN", "ITEM_FREEZERAY", "ITEM_WEBGUN", "ITEM_CAMERA",
+    "ITEM_CROSSBOW", "ITEM_MACHETE", "ITEM_BOOMERANG", "ITEM_MADAMETUSK_IDOL",
+    "ITEM_IDOL", "ITEM_PICKUP_ELIXIR", "ITEM_PICKUP_TABLETOFDESTINY",
+    "ITEM_PICKUP_UDJATEYE", "ITEM_PICKUP_ANKH", "ITEM_PICKUP_HEDJET",
+    "ITEM_PICKUP_CROWN", "ITEM_PICKUP_SKELETON_KEY",
+    "ITEM_PICKUP_SPECIALCOMPASS", "ITEM_PICKUP_COMPASS",
+}
+local function duat_recovery_enabled(ctx)
+    return not ctx.is_duat_recovery_enabled or ctx.is_duat_recovery_enabled()
+end
+local function duat_recovery_type_name(entity_type)
+    local ok,name=pcall(get_entity_name,entity_type,true)
+    return ok and name or tostring(entity_type)
+end
+local function held_by_any_player(uid)
+    for _,player in ipairs(players or {}) do
+        if entity_has_item_uid(player.uid,uid) then return true end
+    end
+    return false
+end
+local function is_duat_recoverable_altar_item(ctx,entity_type)
+    if not ctx.duat_recovery_altar_types then
+        local types={}
+        for _,name in ipairs(DUAT_BACK_ITEM_NAMES) do
+            local item_type=placements.type_of(name)
+            if item_type then types[item_type]=true end
+        end
+        for _,name in ipairs(DUAT_NEAR_ALTAR_ITEM_NAMES) do
+            local item_type=placements.type_of(name)
+            if item_type then types[item_type]=true end
+        end
+        ctx.duat_recovery_altar_types=types
+    end
+    return ctx.duat_recovery_altar_types[entity_type] or false
+end
+local function snapshot_duat_recovery(ctx)
+    if not duat_recovery_enabled(ctx) then return end
+    if state.theme~=THEME.CITY_OF_GOLD then return end
+    local recovered={}
+    for player_index,player in ipairs(players or {}) do
+        local held=player:get_held_entity()
+        if held and held.type then table.insert(recovered,{type=held.type.id,kind="held",player=player_index}) end
+        for _,name in ipairs(DUAT_BACK_ITEM_NAMES) do
+            local item_type=placements.type_of(name)
+            if item_type and entity_has_item_type(player.uid,item_type) then
+                table.insert(recovered,{type=item_type,kind="back",player=player_index})
+                break
+            end
+        end
+    end
+    -- A self-sacrifice or fall can make the carried gear leave the player a
+    -- few frames before the level transition. Preserve any unheld item that
+    -- lands at Kali's altar as well, rather than requiring it to remain in a
+    -- player inventory until the final City of Gold frame.
+    local altar_type=placements.type_of("FLOOR_ALTAR")
+    local nearby_seen={}
+    for _,altar_uid in ipairs(altar_type and get_entities_by_type(altar_type) or {}) do
+        local altar=get_entity(altar_uid)
+        if altar then
+            for _,uid in ipairs(get_entities_by(0,MASK.ITEM,LAYER.BOTH)) do
+                local item=get_entity(uid)
+                if not nearby_seen[uid] and item and item.type and is_duat_recoverable_altar_item(ctx,item.type.id) and item.layer==altar.layer and not held_by_any_player(uid)
+                    and math.abs(item.x-altar.x)+math.abs(item.y-altar.y)<=4 then
+                    nearby_seen[uid]=true
+                    table.insert(recovered,{type=item.type.id,kind="near Kali altar",player=0,uid=uid})
+                end
+            end
+        end
+    end
+    local labels={}
+    for _,item in ipairs(recovered) do
+        table.insert(labels,string.format("P%d %s=%s (type %s)",item.player,item.kind,duat_recovery_type_name(item.type),tostring(item.type)))
+    end
+    local signature=table.concat(labels,"; ")
+    if signature~="" and signature~=ctx.duat_recovery_signature then
+        ctx.duat_recovery=recovered
+        ctx.duat_recovery_signature=signature
+        ctx.duat_recovery_empty_logged=false
+        ctx.log("Duat recovery snapshot detected in City of Gold: "..signature)
+    elseif signature=="" and not ctx.duat_recovery_empty_logged then
+        ctx.duat_recovery_empty_logged=true
+        if ctx.duat_recovery and #ctx.duat_recovery>0 then
+            ctx.log("Duat recovery snapshot in City of Gold: no item currently detected; retaining the last non-empty snapshot for the transition")
+        else
+            ctx.log("Duat recovery snapshot in City of Gold: no held or supported back item detected")
+        end
+    end
+end
+local function restore_duat_recovery(ctx)
+    if not duat_recovery_enabled(ctx) then
+        ctx.duat_recovery=nil
+        return
+    end
+    if state.theme~=THEME.DUAT or ctx.duat_recovery_spawned then return end
+    ctx.duat_recovery_spawned=true
+    local recovered=ctx.duat_recovery
+    if not recovered or #recovered==0 then
+        ctx.log("Duat item recovery reached Duat: no captured items to restore")
+        return
+    end
+    ctx.log("Duat item recovery reached Duat with "..#recovered.." captured item(s); searching for the Duat altar")
+    local altar=duat_altar()
+    if not altar then
+        ctx.log("Duat item recovery found no FLOOR_DUAT_ALTAR; leaving snapshot pending")
+        ctx.duat_recovery_spawned=false
+        return
+    end
+    for index,item in ipairs(recovered) do
+        local offset=(index-1)*0.65
+        local uid=spawn_entity_snapped_to_floor(item.type,altar.x+offset,altar.y+1,altar.layer)
+        ctx.log(string.format("Duat recovery restored P%d %s %s (type %s) at Duat altar (uid %s)",item.player or 0,item.kind,duat_recovery_type_name(item.type),tostring(item.type),tostring(uid)))
+    end
+    ctx.duat_recovery=nil
+end
+local function stage_duat_kali_check(ctx,previous_gifts,gifts)
+    if state.theme~=THEME.CITY_OF_GOLD then return end
+    local check=nil
+    if previous_gifts<1 and gifts>=1 then
+        check="CHECK_KALI_ALTAR_1"
+    elseif previous_gifts<2 and gifts>=2 then
+        check="CHECK_KALI_ALTAR_2"
+    end
+    if check then
+        ctx.duat_kali_check=check
+        ctx.log("City of Gold self-sacrifice triggered "..check.."; staging its mapped reward for Duat")
+    end
+end
+local function restore_duat_kali_check(ctx)
+    local check=ctx.duat_kali_check
+    if state.theme~=THEME.DUAT or not check then return end
+    local altar=duat_altar()
+    if not altar then
+        ctx.log("Duat Kali-check recovery found no FLOOR_DUAT_ALTAR; leaving "..check.." pending")
+        return
+    end
+    local uid=materialize(ctx,check,altar.x-0.65,altar.y+1,altar.layer,nil,true,false)
+    if uid then
+        ctx.duat_kali_check=nil
+        ctx.log("Duat Kali-check recovery restored "..check.." at the altar (uid "..uid..")")
+    end
+end
 local function scan_kali_present_eggplants(ctx, pending, attempt)
-    set_timeout(function()
+    ctx.defer(1,"Kali Present payload scan",function()
         if ctx.pending_kali_present_payload~=pending then return end
         local eggplant_type=placements.type_of("ITEM_EGGPLANT")
         local found=false
@@ -209,7 +375,7 @@ local function scan_kali_present_eggplants(ctx, pending, attempt)
             return
         end
         scan_kali_present_eggplants(ctx,pending,attempt+1)
-    end,1)
+    end)
 end
 local function shop_owner_at_item(item)
     if not is_inside_active_shop_room or not is_inside_active_shop_room(item.x,item.y,item.layer) then return nil end
@@ -234,8 +400,10 @@ end
 local function replace_black_market_hedjet(ctx,attempt)
     if state.theme~=THEME.JUNGLE or ctx.randomizer_state.level_materialized.CHECK_BLACK_MARKET then return end
     local hedjet_type=placements.type_of("ITEM_PICKUP_HEDJET")
+    local saw_hedjet=false
     for _,uid in ipairs(hedjet_type and get_entities_by_type(hedjet_type) or {}) do
         local hedjet=get_entity(uid)
+        if hedjet then saw_hedjet=true end
         -- The Black Market contains several shopkeepers. Use the Hedjet's
         -- registered owner, not the nearest one, or the sale label can appear
         -- without an actual purchase/steal relationship.
@@ -243,7 +411,7 @@ local function replace_black_market_hedjet(ctx,attempt)
         if owner then
             local reward,reward_type=placements.reward_type(ctx.randomizer_state,"CHECK_BLACK_MARKET")
             if not reward_type then
-                ctx.log("Black Market Hedjet replacement has no entity for "..tostring(reward))
+                ctx.lifecycle:fail("CHECK_BLACK_MARKET","mapped reward has no entity type: "..tostring(reward))
                 return
             end
             local price=hedjet.price
@@ -252,21 +420,25 @@ local function replace_black_market_hedjet(ctx,attempt)
             if not added then
                 local replacement=get_entity(replacement_uid)
                 if replacement then replacement:destroy() end
-                ctx.log("Black Market replacement could not be registered as a shop item: "..tostring(err))
+                ctx.lifecycle:fail("CHECK_BLACK_MARKET","replacement could not be registered as a shop item: "..tostring(err))
                 return
             end
             local replacement=get_entity(replacement_uid)
             if replacement and price then replacement.price=price end
             hedjet:destroy()
             ctx.randomizer_state.level_materialized.CHECK_BLACK_MARKET=true
+            ctx.lifecycle:mark("CHECK_BLACK_MARKET","materialized","native shop ownership")
             ctx.log("CHECK CHECK_BLACK_MARKET -> "..reward.." owned by native Shopkeeper uid "..owner.uid.." (price "..tostring(price)..")")
             return
         end
     end
-    if attempt<20 then
-        set_timeout(function() replace_black_market_hedjet(ctx,attempt+1) end,1)
-    elseif hedjet_type then
-        ctx.log("Black Market Hedjet found no native ownership record after 20 frames; leaving native item unchanged")
+    -- A normal Jungle level has no Hedjet at all. Ownership can be late on a
+    -- real Black Market Hedjet, but do not schedule retries or report a
+    -- failure merely because this is an ordinary Jungle level.
+    if saw_hedjet and attempt<20 then
+        ctx.defer(1,"Black Market ownership retry",function() replace_black_market_hedjet(ctx,attempt+1) end)
+    elseif saw_hedjet then
+        ctx.lifecycle:fail("CHECK_BLACK_MARKET","no native shop ownership record after 20 frames; native Hedjet left unchanged")
     end
 end
 local function place_kali_present_source(ctx)
@@ -286,8 +458,9 @@ local function place_kali_present_source(ctx)
     end
     local altar_type=placements.type_of("FLOOR_ALTAR")
     local present_type=placements.type_of("ITEM_PRESENT")
-    if not altar_type or not present_type then
-        ctx.log("Kali Present source adapter unavailable: altar or Present entity is missing")
+    local diamond_type=placements.type_of("ITEM_DIAMOND")
+    if not altar_type or not present_type or not diamond_type then
+        ctx.log("Kali Present source adapter unavailable: altar, Present, or Diamond entity is missing")
         return
     end
     local altars=get_entities_by_type(altar_type)
@@ -303,7 +476,19 @@ local function place_kali_present_source(ctx)
                 local x,y,layer=pet.x,pet.y,pet.layer
                 local shop_owner=shop_owner_at_item(pet)
                 local pet_price=pet.price
+                -- Claim the source before spawning. Spawn callbacks can
+                -- re-enter adapter code while this function is still active;
+                -- without this claim the same pet can become two Presents.
+                ctx.kali_present_source_placed=true
+                ctx.kali_present_source_seen=false
+                ctx.kali_present_source_location={world=world,level=state.level,theme=state.theme,x=x,y=y,layer=layer}
                 local present_uid=spawn_entity_nonreplaceable(present_type,x,y,layer,0,0)
+                if not present_uid then
+                    ctx.kali_present_source_placed=false
+                    ctx.kali_present_source_location=nil
+                    ctx.lifecycle:fail("CHECK_KALI_PRESENT","could not spawn Present source")
+                    return
+                end
                 if shop_owner then
                     local added,err=pcall(add_item_to_shop,present_uid,shop_owner.uid)
                     if added then
@@ -315,12 +500,20 @@ local function place_kali_present_source(ctx)
                     end
                 end
                 pet:destroy()
-                ctx.kali_present_source_placed=true
                 ctx.kali_present_source_uid=present_uid
-                ctx.kali_present_source_seen=false
-                ctx.kali_present_source_location={world=world,level=state.level,theme=state.theme,x=x,y=y,layer=layer}
                 local present=get_entity(present_uid)
                 if present then
+                    -- The game fills a freshly spawned Present on its next
+                    -- update. Configure its payload after that initialization
+                    -- frame; assigning `inside` immediately is overwritten by
+                    -- the vanilla random Present roll.
+                    ctx.defer(1,"Kali Present Diamond payload",function()
+                        local source=get_entity(present_uid)
+                        if source and source.type.id==present_type then
+                            source.inside=diamond_type
+                            ctx.log("Kali Present source uid "..present_uid.." payload forced to Diamond")
+                        end
+                    end)
                     present:set_pre_destroy(function(self)
                         if ctx.kali_present_completed or ctx.randomizer_state.level_materialized.CHECK_KALI_PRESENT then return end
                         local altar=nearest_kali_altar(self.x,self.y,self.layer)
@@ -348,26 +541,44 @@ local function place_kali_present_source(ctx)
     end
     ctx.log("Kali Present altar level has no pet; will try the next eligible level")
 end
-local function replace_first_kali_gift(ctx,existing_items)
+local function replace_first_kali_gift(ctx,existing_items,attempt,replacement_uid)
     local player=players and players[1]
     if not player then return end
     local altar=nearest_kali_altar(player.x,player.y,player.layer)
     if not altar then ctx.log("Kali first-gift check could not find an altar") return end
-    local candidate,candidate_distance=nil,math.huge
+    local candidates={}
     for _,uid in ipairs(get_entities_by(0,MASK.ITEM,LAYER.BOTH)) do
         local item=get_entity(uid)
         if item and not existing_items[uid] and item.layer==altar.layer then
             local distance=math.abs(item.x-altar.x)+math.abs(item.y-altar.y)
-            if distance<=3 and distance<candidate_distance then candidate,candidate_distance=item,distance end
+            if distance<=3 and uid~=replacement_uid then
+                table.insert(candidates,{entity=item,distance=distance})
+            end
         end
     end
-    if candidate then
+    table.sort(candidates,function(a,b) return a.distance<b.distance end)
+    local candidate=candidates[1] and candidates[1].entity or nil
+    if candidate and not replacement_uid then
         local expected=ctx.randomizer_state.mapping and ctx.randomizer_state.mapping.CHECK_KALI_ALTAR_1
         ctx.log(string.format("Kali first-gift candidate uid %d type %d at %.1f, %.1f; mapped reward %s",candidate.uid,candidate.type.id,candidate.x,candidate.y,tostring(expected)))
-        -- Test the native altar gift position as a safe Eggplant anchor.
-        local replacement_uid=materialize(ctx,"CHECK_KALI_ALTAR_1",candidate.x,candidate.y,candidate.layer,candidate.uid,true,false)
+        -- Kali can emit a second native item after kali_gifts increments.
+        -- Replace the first one, then keep this source window open briefly
+        -- to remove only any additional native altar payloads.
+        replacement_uid=materialize(ctx,"CHECK_KALI_ALTAR_1",candidate.x,candidate.y,candidate.layer,candidate.uid,true,false)
         ctx.log("Kali first-gift replacement result uid "..tostring(replacement_uid))
-    else
+    end
+    if replacement_uid then
+        for _,entry in ipairs(candidates) do
+            local extra=entry.entity
+            if extra and extra.uid~=replacement_uid then
+                extra:destroy()
+                ctx.log("Removed extra native Kali first-gift item uid "..extra.uid)
+            end
+        end
+        if (attempt or 1)<3 then
+            ctx.defer(1,"Kali first-gift cleanup",function() replace_first_kali_gift(ctx,existing_items,(attempt or 1)+1,replacement_uid) end)
+        end
+    elseif not candidate then
         ctx.log("Kali first-gift check found no generated reward item near altar")
     end
 end
@@ -441,9 +652,9 @@ function M.replace_excalibur_if_gated(ctx, attempt)
     attempt=attempt or 0
     if attempt<30 then
         if attempt==0 then ctx.log("Excalibur gate is open, but the sword has not spawned yet; retrying") end
-        set_timeout(function() M.replace_excalibur_if_gated(ctx,attempt+1) end,5)
+        ctx.defer(5,"Excalibur stone retry",function() M.replace_excalibur_if_gated(ctx,attempt+1) end)
     else
-        ctx.log("Excalibur gate stayed open but no native sword-in-stone appeared after retries")
+        ctx.lifecycle:fail("CHECK_EXCALIBUR_STONE","gate was open but no native sword-in-stone appeared after retries")
     end
 end
 
@@ -465,13 +676,13 @@ local function attach_delayed_death_reward(ctx, source, check, hook_field, pendi
                 local pending={x=self.x,y=self.y,layer=self.layer}
                 ctx[pending_field]=pending
                 ctx.log(string.format("%s reward queued from %s at %.1f, %.1f layer %s",label,trigger,pending.x,pending.y,tostring(pending.layer)))
-                set_timeout(function()
+                ctx.defer(2,label.." fallback",function()
                     if ctx[pending_field]==pending then
                         ctx[pending_field]=nil
                         local reward_uid=materialize(ctx,check,pending.x,pending.y,pending.layer,nil,true)
                         ctx.log(label.." fallback materialization result uid "..tostring(reward_uid))
                     end
-                end,2)
+                end)
             end
             boss:set_pre_kill(function(self)
                 queue_reward(self,"pre-kill")
@@ -480,18 +691,155 @@ local function attach_delayed_death_reward(ctx, source, check, hook_field, pendi
         end
     end
 end
+local function queue_lahamu_reward(ctx, uid, watch, trigger)
+    if watch.queued then return end
+    watch.queued=true
+    ctx.log(string.format("Lahamu uid %d %s; scheduling check reward at %.1f, %.1f layer %s",uid,trigger,watch.x,watch.y,tostring(watch.layer)))
+    ctx.defer(2,"Lahamu "..trigger.." materialization",function()
+        -- A disappearance during a level transition is not a death. The
+        -- level identity is more reliable than assuming Mothership always
+        -- reports the Ice Caves theme.
+        if state.world~=watch.world or state.level~=watch.level or state.theme~=watch.theme or ctx.randomizer_state.level_materialized.CHECK_LAHAMU then return end
+        local reward_uid=materialize(ctx,"CHECK_LAHAMU",watch.x,watch.y,watch.layer,nil,true)
+        ctx.log("Lahamu "..trigger.." materialization result uid "..tostring(reward_uid))
+    end)
+end
+
+local LAHAMU_TYPE_NAMES={"MONS_LAHAMU","MONS_LAMASSU"}
+local function is_mothership_level()
+    return state.world==5 and state.level==1
+end
+local function lahamu_types()
+    local types={}
+    for _,name in ipairs(LAHAMU_TYPE_NAMES) do
+        local entity_type=placements.type_of(name)
+        if entity_type then table.insert(types,entity_type) end
+    end
+    return types
+end
+local function attach_lahamu(ctx, uid, lahamu)
+    if not lahamu or ctx.lahamu_hooks[uid] then return end
+    local watch={x=lahamu.x,y=lahamu.y,layer=lahamu.layer,world=state.world,level=state.level,theme=state.theme,queued=false}
+    ctx.lahamu_hooks[uid]=watch
+    -- Most kills take this direct path. The frame watcher below still covers
+    -- Lahamu's scripted removal path, which can skip it.
+    lahamu:set_pre_kill(function(self)
+        watch.x,watch.y,watch.layer=self.x,self.y,self.layer
+        queue_lahamu_reward(ctx,uid,watch,"pre-kill")
+    end)
+    ctx.log("Attached Lahamu death hook and entity watcher to uid "..uid)
+end
+
 local function observe_lahamu(ctx)
-    local lahamu_type=placements.type_of("MONS_LAHAMU")
-    for _,uid in ipairs(lahamu_type and get_entities_by_type(lahamu_type) or {}) do
-        local lahamu=get_entity(uid)
-        if lahamu and not ctx.lahamu_hooks[uid] then
-            ctx.lahamu_hooks[uid]={x=lahamu.x,y=lahamu.y,layer=lahamu.layer,queued=false}
-            ctx.log("Attached Lahamu entity watcher to uid "..uid)
+    if not is_mothership_level() then return end
+    local types=lahamu_types()
+    local found=0
+    for _,uid in ipairs(#types>0 and get_entities_by_type(types) or {}) do
+        attach_lahamu(ctx,uid,get_entity(uid))
+        found=found+1
+    end
+    -- Enum aliases have differed between Overlunky releases. The Mothership
+    -- contains one uniquely named Lahamu, so fall back to the live entity
+    -- name rather than silently missing her when an enum lookup changes.
+    if found==0 then
+        for _,uid in ipairs(get_entities_by(0,MASK.MONSTER,LAYER.BOTH)) do
+            local monster=get_entity(uid)
+            if monster and monster.type then
+                local ok,name=pcall(get_entity_name,monster.type.id,true)
+                if ok and name=="Lahamu" then
+                    attach_lahamu(ctx,uid,monster)
+                    found=found+1
+                    ctx.log("Attached Lahamu through Mothership name fallback (type "..tostring(monster.type.id)..", uid "..uid..")")
+                end
+            end
+        end
+    end
+    if found==0 and not ctx.lahamu_diagnostic_logged then
+        ctx.lahamu_diagnostic_logged=true
+        local monsters={}
+        for _,uid in ipairs(get_entities_by(0,MASK.MONSTER,LAYER.BOTH)) do
+            local monster=get_entity(uid)
+            if monster and monster.type then
+                local ok,name=pcall(get_entity_name,monster.type.id,true)
+                monsters[name or tostring(monster.type.id)]=true
+            end
+        end
+        local names={}
+        for name in pairs(monsters) do table.insert(names,name) end
+        table.sort(names)
+        ctx.log("Mothership Lahamu scan found no known entity; monsters present: "..table.concat(names,", "))
+    end
+end
+
+local function observe_sparrow_hideout(ctx)
+    if state.theme~=THEME.NEO_BABYLON or state.level~=1 then return end
+    local sparrow_type=placements.type_of("MONS_SPARROW")
+    if not sparrow_type then
+        ctx.log("Sparrow 6-1 diagnostic unavailable: MONS_SPARROW entity type missing")
+        return
+    end
+    local found={}
+    for _,uid in ipairs(get_entities_by_type(sparrow_type) or {}) do
+        local sparrow=get_entity(uid)
+        if sparrow then
+            table.insert(found,string.format("uid %d at %.1f, %.1f layer %s",uid,sparrow.x,sparrow.y,tostring(sparrow.layer)))
+        end
+    end
+    if #found>0 then
+        ctx.log("Sparrow 6-1 hideout entity detected: "..table.concat(found,"; "))
+    elseif state.quests and state.quests.sparrow_state>=6 then
+        ctx.log("WARNING: Sparrow quest state is "..tostring(state.quests.sparrow_state).." in 6-1, but no Sparrow entity was found")
+    end
+end
+
+local function attach_true_crown_recovery(ctx)
+    local function is_cursed(player)
+        local ok,value=pcall(function() return player:is_cursed() end)
+        if ok and type(value)=="boolean" then return value end
+        ok,value=pcall(function() return player.cursed end)
+        if ok and type(value)=="boolean" then return value end
+        ok,value=pcall(function() return test_flag(player.flags,ENT_FLAG.CURSED) end)
+        return ok and value or false
+    end
+    local beg_type=placements.type_of("MONS_HUNDUNS_SERVANT")
+    for _,uid in ipairs(beg_type and get_entities_by_type(beg_type) or {}) do
+        local beg=get_entity(uid)
+        if beg and not ctx.beg_hooks[uid] then
+            ctx.beg_hooks[uid]=true
+            beg:set_pre_kill(function()
+                local quests=state.quests
+                if ctx.beg_true_crown_healed or not quests or (quests.beg_state or 0)<4 then return end
+                -- Delay until the native True Crown drop/check completion has
+                -- begun, so the curse applied by this encounter is cleared
+                -- afterwards rather than being immediately reapplied.
+                ctx.defer(2,"True Crown recovery",function()
+                    if ctx.beg_true_crown_healed then return end
+                    ctx.beg_true_crown_healed=true
+                    local cured=0
+                    for _,player in ipairs(players or {}) do
+                        if is_cursed(player) then
+                            player:set_cursed(false)
+                            player.health=math.max(player.health,4)
+                            cured=cured+1
+                        end
+                    end
+                    ctx.log("True Crown check complete: cured "..cured.." player(s) and restored each to at least 4 HP")
+                end)
+            end)
+            ctx.log("Attached True Crown recovery hook to Beg uid "..uid)
         end
     end
 end
 
 function M.on_post_level_generation(ctx)
+    if state.theme==THEME.DUAT then
+        restore_duat_kali_check(ctx)
+        restore_duat_recovery(ctx)
+    elseif state.theme~=THEME.CITY_OF_GOLD then
+        -- A transition other than City of Gold -> Duat must not carry an old
+        -- snapshot into a later, unrelated Duat visit.
+        ctx.duat_recovery=nil
+    end
     -- Present identities are level-local. Clearing them here prevents an item
     -- left on a prior level from being mistaken for a sacrifice on this one.
     ctx.kali_presents={}
@@ -516,7 +864,7 @@ function M.on_post_level_generation(ctx)
     if theme==THEME.TIDE_POOL and state.level==2 and not ctx.randomizer_state.level_materialized.CHECK_HUMPHEAD_CAVE_IDOL then
         -- The clam's Idol can be created after the first item scan. Recheck
         -- after its cave has completed construction.
-        set_timeout(function()
+        ctx.defer(20,"Humphead cave Idol retry",function()
             if ctx.randomizer_state.level_materialized.CHECK_HUMPHEAD_CAVE_IDOL then return end
             local idol_type=placements.type_of("ITEM_IDOL")
             local idols=idol_type and get_entities_by_type(idol_type) or {}
@@ -528,16 +876,18 @@ function M.on_post_level_generation(ctx)
                     return
                 end
             end
-        end,20)
+        end)
     end
     replace_van_reward(ctx,items)
     replace_tusk_idol_room(ctx)
+    observe_sparrow_hideout(ctx)
+    attach_true_crown_recovery(ctx)
     replace_black_market_hedjet(ctx,1)
     place_kali_present_source(ctx)
     if theme==THEME.TIDE_POOL then
         -- Delay beyond room construction; this also covers a Crown granted by
         -- the optional test-resources callback at ON.START.
-        set_timeout(function() M.replace_excalibur_if_gated(ctx) end,10)
+        ctx.defer(10,"Excalibur stone initial scan",function() M.replace_excalibur_if_gated(ctx) end)
     end
     for _,anchor in ipairs(NPC_ANCHORS) do
         if theme==anchor.theme then
@@ -553,6 +903,27 @@ function M.on_post_level_generation(ctx)
     end
     if theme==THEME.DWELLING then
         attach_delayed_death_reward(ctx,"MONS_CAVEMAN_BOSS","CHECK_QUILLBACK","quillback_hooks","pending_quillback_drop","Quillback death")
+    end
+    -- Tiamat has no item drop to intercept. Her check is earned on death, so
+    -- wait for her death animation rather than materializing at level start.
+    if theme==THEME.TIAMAT then
+        attach_delayed_death_reward(ctx,"MONS_TIAMAT","CHECK_TIAMAT","tiamat_hooks","pending_tiamat_reward","Tiamat death")
+    end
+    -- Vlad's Cape is a death reward, not a room item.  Never scan all Capes
+    -- in Volcana: a carried Cape is reconstructed during level transitions.
+    if theme==THEME.VOLCANA then
+        local vlad_type=placements.type_of("MONS_VLAD")
+        for _,uid in ipairs(vlad_type and get_entities_by_type(vlad_type) or {}) do
+            local vlad=get_entity(uid)
+            if vlad and not ctx.vlad_hooks[uid] then
+                ctx.vlad_hooks[uid]=true
+                vlad:set_pre_kill(function(self)
+                    ctx.pending_vlad_cape={x=self.x,y=self.y,layer=self.layer}
+                    ctx.log(string.format("Vlad death detected at %.1f, %.1f layer %s; waiting for native Cape",self.x,self.y,tostring(self.layer)))
+                end)
+                ctx.log("Attached Vlad Cape death hook to uid "..uid)
+            end
+        end
     end
     -- Yeti royalty checks replace their exact death drops. Spawning a reward
     -- beside the boss left the native Spike Shoes/Compass in the item pool.
@@ -570,12 +941,12 @@ function M.on_post_level_generation(ctx)
                     boss:set_pre_kill(function(self)
                         local pending={check=check,native_drop=native_drop,x=self.x,y=self.y,layer=self.layer}
                         ctx.pending_yeti_drops[native_drop]=pending
-                        set_timeout(function()
+                        ctx.defer(2,check.." native-drop fallback",function()
                             if ctx.pending_yeti_drops[native_drop]==pending then
                                 ctx.pending_yeti_drops[native_drop]=nil
                                 materialize(ctx,check,pending.x,pending.y,pending.layer,nil,true)
                             end
-                        end,2)
+                        end)
                     end)
                     ctx.log("Attached "..check.." death-drop hook to uid "..uid)
                 end
@@ -584,10 +955,10 @@ function M.on_post_level_generation(ctx)
         attach_yeti("MONS_YETIQUEEN","CHECK_YETI_QUEEN",placements.type_of("ITEM_PICKUP_SPIKESHOES"))
         attach_yeti("MONS_YETIKING","CHECK_YETI_KING",placements.type_of("ITEM_PICKUP_COMPASS"))
 
-        -- Preserve Lahamu's ordinary native reward. Her removal path does not
-        -- reliably invoke normal kill callbacks, so track the entity itself.
-        observe_lahamu(ctx)
     end
+    -- Do not assume a particular theme for Mothership's internal room state.
+    -- The entity type is the authoritative scope for this adapter.
+    observe_lahamu(ctx)
     -- Humphead's DROP entry is a script-owned Hired Hand, so it cannot be
     -- substituted directly. Wait for its native Present and replace that
     -- independent item instead.
@@ -606,11 +977,6 @@ function M.on_post_level_generation(ctx)
             end
         end
     end
-    -- Anubis II's Jetpack is created when he dies.  Do not use a generic
-    -- Jetpack scan: Duat can contain other Jetpacks from player actions.
-    if theme==THEME.DUAT then
-        attach_delayed_death_reward(ctx,"MONS_ANUBIS2","CHECK_ANUBIS_II","anubis2_hooks","pending_anubis2_drop","Anubis II Jetpack")
-    end
     -- First Anubis's Scepter is likewise a death reward. Its spawn does not
     -- have an exposed DROP constant, so bind the replacement to this boss.
     if theme==THEME.TEMPLE then
@@ -624,7 +990,82 @@ function M.on_post_level_generation(ctx)
 end
 
 function M.register_spawn_hooks(ctx)
+    -- Sparrow advances the moment the game accepts the Tusk Idol at a level
+    -- exit. Watching the quest state lets us distinguish that from merely
+    -- entering Tusk's room or picking up/selling an Idol.
+    set_callback(function()
+        local quests=state.quests
+        local sparrow_state=quests and quests.sparrow_state
+        if sparrow_state==nil then return end
+        if ctx.sparrow_last_state==nil then
+            ctx.sparrow_last_state=sparrow_state
+            ctx.log("Sparrow quest state initialized: "..tostring(sparrow_state))
+        elseif ctx.sparrow_last_state~=sparrow_state then
+            local previous=ctx.sparrow_last_state
+            ctx.sparrow_last_state=sparrow_state
+            ctx.sparrow_last_transition={
+                from=previous, to=sparrow_state,
+                world=state.world, level=state.level, theme=state.theme,
+            }
+            ctx.log(string.format("Sparrow quest state changed: %s -> %s at %d-%d (theme %s)",tostring(previous),tostring(sparrow_state),state.world,state.level,tostring(state.theme)))
+        end
+    end,ON.FRAME)
+    set_callback(function()
+        snapshot_duat_recovery(ctx)
+    end,ON.FRAME)
     local present_type=placements.type_of("ITEM_PRESENT")
+    local playerbag_type=placements.type_of("ITEM_PICKUP_PLAYERBAG")
+    if playerbag_type then
+        set_post_entity_spawn(function(entity)
+            if state.theme~=THEME.NEO_BABYLON or state.level~=3 or entity.layer~=LAYER.BACK
+                or ctx.randomizer_state.level_materialized.CHECK_SPARROW_VAULT then return end
+            local uid,x,y,layer=entity.uid,entity.x,entity.y,entity.layer
+            -- Sparrow configures the Player Bag after the spawn callback.
+            -- Wait one frame, then destroy that fully configured source and
+            -- make an independent mapped item.  The bag's final setup also
+            -- leaves the replacement hidden for a frame, so repair its
+            -- visible flag after that setup has completed.
+            ctx.defer(1,"Sparrow vault Player Bag replacement",function()
+                if ctx.randomizer_state.level_materialized.CHECK_SPARROW_VAULT then return end
+                local replacement_uid=materialize(ctx,"CHECK_SPARROW_VAULT",x,y,layer,uid,true)
+                ctx.log("Sparrow vault Player Bag replaced after native setup (uid "..tostring(replacement_uid)..")")
+                if replacement_uid then
+                    ctx.defer(1,"Sparrow vault replacement visibility",function()
+                        local replacement=get_entity(replacement_uid)
+                        if replacement then
+                            replacement.flags=clr_flag(replacement.flags,ENT_FLAG.INVISIBLE)
+                            if replacement.color then replacement.color.a=1 end
+                        end
+                    end)
+                end
+            end)
+        end,SPAWN_TYPE.ANY,MASK.ITEM,playerbag_type)
+    else
+        ctx.log("Sparrow vault adapter unavailable: ITEM_PICKUP_PLAYERBAG entity type missing")
+    end
+    local anubis2_type=placements.type_of("MONS_ANUBIS2")
+    if anubis2_type then
+        -- Anubis II is created only after the player reaches the top of Duat.
+        -- The drop replacement is already armed in PRE level generation; this
+        -- log confirms the delayed boss arrived under that configuration.
+        set_post_entity_spawn(function(entity)
+            if state.theme==THEME.DUAT then
+                ctx.log("Anubis II spawned uid "..entity.uid.."; direct Jetpack replacement armed="..tostring(ctx.drop_configured[DROP.ANUBIS2_JETPACK]~=nil))
+            end
+        end,SPAWN_TYPE.ANY,0,anubis2_type)
+    else
+        ctx.log("Anubis II spawn diagnostic unavailable: MONS_ANUBIS2 entity type missing")
+    end
+    local types=lahamu_types()
+    if #types>0 then
+        -- Mothership can finish creating Lahamu after the normal level scan.
+        -- Attach at her actual spawn as well as scanning after generation.
+        for _,entity_type in ipairs(types) do
+            set_post_entity_spawn(function(entity)
+                if is_mothership_level() then attach_lahamu(ctx,entity.uid,entity) end
+            end,SPAWN_TYPE.ANY,0,entity_type)
+        end
+    end
     -- `touch` becomes zero on a player pickup. We only track the particular
     -- Crown/Hedjet entities this randomizer materialized, so other items do
     -- not accidentally satisfy the logic gate.
@@ -661,6 +1102,19 @@ function M.register_spawn_hooks(ctx)
             local reward=placements.reward_type(ctx.randomizer_state,"CHECK_QUILLBACK")
             return replace_native_spawn(ctx,"CHECK_QUILLBACK",reward,x,y,layer,true)
         end,SPAWN_TYPE.ANY,MASK.ITEM,bomb_bag_type)
+    end
+
+    local vlads_cape_type=placements.type_of("ITEM_VLADS_CAPE")
+    if vlads_cape_type then
+        set_pre_entity_spawn(function(entity_type,x,y,layer)
+            local pending=ctx.pending_vlad_cape
+            if entity_type~=vlads_cape_type or not pending or layer~=pending.layer then return nil end
+            if math.abs(x-pending.x)+math.abs(y-pending.y)>8 then return nil end
+            ctx.pending_vlad_cape=nil
+            local reward=placements.reward_type(ctx.randomizer_state,"CHECK_VLAD")
+            ctx.log("Replacing Vlad's native Cape death reward")
+            return replace_native_spawn(ctx,"CHECK_VLAD",reward,x,y,layer,true)
+        end,SPAWN_TYPE.ANY,MASK.ITEM,vlads_cape_type)
     end
 
     -- Yeti Queen and King have distinct fixed death drops. Intercept only an
@@ -763,7 +1217,7 @@ function M.register_spawn_hooks(ctx)
             -- The game finishes setting up the Bow after this callback. Delay
             -- one frame, then move it to limbo (not merely the back layer) so
             -- it remains a valid entity for Tun but cannot be seen or picked.
-            set_timeout(function()
+            ctx.defer(1,"Moon Challenge Bow handoff",function()
                 local bow=get_entity(bow_uid)
                 if not bow then
                     ctx.log("Moon Challenge Bow uid "..bow_uid.." disappeared before it could be hidden")
@@ -789,7 +1243,7 @@ function M.register_spawn_hooks(ctx)
                 materialize(ctx,check,x,y,layer,nil,false,false)
                 ctx.moon_handoff_spawning=false
                 ctx.log("Moon Challenge native Bow moved to limbo; mapped reward placed at its location (uid "..bow_uid..")")
-            end,1)
+            end)
         end,SPAWN_TYPE.ANY,MASK.ITEM,bow_type)
     else
         ctx.log("Moon Challenge deferred adapter unavailable: ITEM_HOUYIBOW is missing")
@@ -806,12 +1260,12 @@ function M.register_spawn_hooks(ctx)
             ctx.pending_humphead_present=nil
             local present_uid=entity.uid
             local x,y,layer=entity.x,entity.y,entity.layer
-            set_timeout(function()
+            ctx.defer(1,"Humphead Present replacement",function()
                 -- Humphead's reward is contained underwater, which is a safe
                 -- anchor for Eggplant rather than a volatile death drop.
                 materialize(ctx,"CHECK_HUMPHEAD",x,y,layer,present_uid,true,false)
                 ctx.log("Humphead native Present replaced (uid "..present_uid..")")
-            end,1)
+            end)
         end,SPAWN_TYPE.ANY,MASK.ITEM,present_type)
     end
 
@@ -852,9 +1306,10 @@ function M.register_spawn_hooks(ctx)
             return
         end
         if gifts>ctx.kali_last_gifts then
+            stage_duat_kali_check(ctx,ctx.kali_last_gifts,gifts)
             if ctx.kali_last_gifts<1 and gifts>=1 and not ctx.kali_present_sacrifice_pending and not ctx.kali_present_completed then
                 local items_before=ctx.kali_known_items or {}
-                set_timeout(function() replace_first_kali_gift(ctx,items_before) end,1)
+                ctx.defer(1,"Kali first-gift replacement",function() replace_first_kali_gift(ctx,items_before) end)
             elseif ctx.kali_last_gifts<1 and gifts>=1 then
                 ctx.log("Kali normal gift occurred while the Present replacement was still pending; skipping this reward")
             end
@@ -867,19 +1322,18 @@ function M.register_spawn_hooks(ctx)
     -- Watch the real entity each frame, retain its last known position, and
     -- add the check reward only after it has died or disappeared.
     set_callback(function()
-        if state.theme~=THEME.ICE_CAVES or ctx.randomizer_state.level_materialized.CHECK_LAHAMU then return end
+        if ctx.randomizer_state.level_materialized.CHECK_LAHAMU then return end
         for uid,watch in pairs(ctx.lahamu_hooks or {}) do
-            local lahamu=get_entity(uid)
-            if lahamu and (not lahamu.health or lahamu.health>0) then
-                watch.x,watch.y,watch.layer=lahamu.x,lahamu.y,lahamu.layer
-            elseif not watch.queued then
-                watch.queued=true
-                ctx.log(string.format("Lahamu uid %d %s; scheduling check reward at %.1f, %.1f layer %s",uid,lahamu and "reached zero health" or "disappeared",watch.x,watch.y,tostring(watch.layer)))
-                set_timeout(function()
-                    if state.theme~=THEME.ICE_CAVES or ctx.randomizer_state.level_materialized.CHECK_LAHAMU then return end
-                    local reward_uid=materialize(ctx,"CHECK_LAHAMU",watch.x,watch.y,watch.layer,nil,true)
-                    ctx.log("Lahamu watcher materialization result uid "..tostring(reward_uid))
-                end,2)
+            if state.world==watch.world and state.level==watch.level and state.theme==watch.theme then
+                local lahamu=get_entity(uid)
+                if lahamu then
+                    watch.x,watch.y,watch.layer=lahamu.x,lahamu.y,lahamu.layer
+                    if lahamu.health and lahamu.health<=0 then
+                        queue_lahamu_reward(ctx,uid,watch,"zero-health watcher")
+                    end
+                else
+                    queue_lahamu_reward(ctx,uid,watch,"disappearance watcher")
+                end
             end
         end
     end,ON.FRAME)

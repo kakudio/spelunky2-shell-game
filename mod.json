@@ -1,7 +1,7 @@
 {
   "name": "Key Item Randomizer",
   "description": "Shuffles key progression items (Ankh, Crown, Excalibur, Elixir, Arrow of Light, Hou Yi's Bow, etc.) to create unique paths to Hundun and Cosmic Ocean",
-  "version": "0.1.0",
+  "version": "0.3.0",
   "author": "Spelunky 2 Randomizer",
   "main": "main.lua",
   "api_version": "2.0",

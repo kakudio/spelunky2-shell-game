@@ -1,6 +1,6 @@
 # Check verification ledger
 
-Last updated: 2026-07-31
+Last updated: 2026-08-01
 
 Status is intentionally based on observed in-game behavior, not merely on the
 presence of an adapter in code. A fresh logic-version change requires a new
@@ -29,25 +29,32 @@ run before treating a previous result as current.
 | `CHECK_STARS_CHALLENGE_TIDE_POOL` | The Tide Pool Stars Challenge reward is replaced by the mapped reward. |
 | `CHECK_HUMPHEAD` | Humphead's present is replaced by the mapped reward on defeat. |
 | `CHECK_YETI_QUEEN` / `CHECK_YETI_KING` | Each Yeti royal reward is replaced by its mapped reward. |
+| `CHECK_MOTHERSHIP_PLASMA_CANNON` | The Mothership's back-layer Plasma Cannon is replaced by the mapped reward. |
+| `CHECK_LAHAMU` | Lahamu's reward is replaced by the mapped reward on defeat. |
+| `CHECK_BEG_TRUE_CROWN` | Beg's True Crown reward is replaced by the mapped reward. |
+| `CHECK_KALI_ALTAR_2` | Kali's second reward is replaced by the mapped reward. |
+| `CHECK_ANUBIS_SCEPTER` | Anubis's Scepter drop is replaced by the mapped reward on defeat. |
+| `CHECK_TUSK_PALACE_VISIT` | Tusk's Palace reward is replaced by the mapped reward. |
+| `CHECK_HUMPHEAD_CAVE_IDOL` | Great Humphead's cave Idol is replaced by the mapped reward. |
+| `CHECK_STARS_CHALLENGE_TEMPLE` | The Temple Stars Challenge reward is replaced by the mapped reward. |
+| `CHECK_OSIRIS` | Osiris's Tablet drop is replaced by the mapped reward on defeat. |
+| `CHECK_TIAMAT` | Tiamat's reward is replaced by the mapped reward on defeat. |
+| `CHECK_ANUBIS_II` | Anubis II's reward is replaced by the mapped reward on defeat. |
+| `CHECK_ALIEN_COMPASS` | Van Horsing's Alien Compass reward is replaced by the mapped reward. |
 
-## Adapter fired; needs a final player-facing confirmation
+## Known regression
 
-| Check | Evidence to date | Remaining check |
-|---|---|---|
-| `CHECK_KALI_ALTAR_1` | Logs show a mapped item materialized after the first gift. | Confirm that only the mapped item remains and no vanilla first-gift item survives. |
+| Check | Status |
+|---|---|
+| `CHECK_KALI_ALTAR_1` | Previously verified, but currently reported as buggy; needs diagnosis and a fresh in-game verification. |
 
 ## Implemented, not yet verified in-game
 
 | Check(s) | Test to perform |
 |---|---|
-| `CHECK_TUSK_PALACE_VISIT`, `CHECK_SPARROW_VAULT` | Exercise each Neo Babylon 6-3 quest step. For Sparrow, open exactly four vault chests and speak to her; only her completion Player Bag should change. |
-| `CHECK_HUMPHEAD_CAVE_IDOL` | Enter Great Humphead's Tide Pool 4-2 cave and verify its back-layer Idol is replaced by the mapped reward. |
-| `CHECK_ANUBIS_SCEPTER`, `CHECK_ALIEN_COMPASS`, `CHECK_STARS_CHALLENGE_TEMPLE` | Defeat Anubis and enter the Temple Stars Challenge/Van route. |
-| `CHECK_OSIRIS`, `CHECK_ANUBIS_II` | Defeat Osiris and Anubis II in Duat. |
+| `CHECK_SPARROW_VAULT` | Open exactly four vault chests and speak to Sparrow; only her completion Player Bag should change. |
 | `CHECK_EGGPLANT_KING` | Complete the Eggplant chain and defeat Yama; his native Eggplant Crown should be replaced. Moai remains a vanilla interaction, not a randomizer check. |
-| `CHECK_LAHAMU`, `CHECK_MOTHERSHIP_PLASMA_CANNON` | Visit the Mothership route, defeat Lahamu, and verify the back-layer Plasma Cannon. |
-| `CHECK_TIAMAT`, `CHECK_SUN_CHALLENGE` | Defeat Tiamat and complete the Sun Challenge. |
-| `CHECK_KALI_ALTAR_2`, `CHECK_BEG_TRUE_CROWN` | Complete their dialogue/action events. |
+| `CHECK_SUN_CHALLENGE` | Complete the Sun Challenge and verify its mapped reward. |
 
 ## Run-level verification
 
@@ -56,3 +63,10 @@ run before treating a previous result as current.
 - `kir_spoiler()` must remain stable for the same non-zero randomizer seed.
 - Save/quit/reload with an uncollected mapped item still on the ground; verify
   it neither vanishes nor duplicates.
+- Enter Duat while holding an item and wearing a back item; verify both copies
+  appear on Duat's Kali altar, while the Ankh remains consumed.
+- If the City of Gold self-sacrifice triggers a Kali check reward, verify that
+  mapped reward is also placed on Duat's Kali altar, even with Duat Item
+  Recovery disabled.
+- Complete Beg's True Crown check while cursed; verify the player is cured and
+  restored to at least 4 HP, while uncursed players' health is unchanged.

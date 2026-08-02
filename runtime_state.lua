@@ -1,40 +1,58 @@
 -- Centralized transient and run-scoped state for gameplay adapters.
 
+local lifecycle=require "check_lifecycle"
 local M={}
 
 local LEVEL_TABLES={
     "quillback_hooks", "beg_hooks", "anubis_hooks", "anubis2_hooks",
-    "humphead_hooks", "yeti_hooks", "lahamu_hooks", "eggplant_king_hooks",
+    "humphead_hooks", "yeti_hooks", "lahamu_hooks", "vlad_hooks", "tiamat_hooks", "eggplant_king_hooks",
     "moon_bows", "moon_hidden_bows",
 }
 
-function M.new(randomizer_state, initialize, log)
-    return {
+function M.new(randomizer_state, initialize, log, is_duat_recovery_enabled)
+    local ctx={
         randomizer_state=randomizer_state,
         quillback_hooks={}, beg_hooks={}, anubis_hooks={}, anubis2_hooks={},
-        humphead_hooks={}, yeti_hooks={}, lahamu_hooks={}, eggplant_king_hooks={},
+        humphead_hooks={}, yeti_hooks={}, lahamu_hooks={}, vlad_hooks={}, tiamat_hooks={}, eggplant_king_hooks={},
         pending_yeti_drops={}, spawn_replacements={}, moon_bows={}, moon_hidden_bows={},
+        lahamu_diagnostic_logged=false,
         moon_handoff_spawning=false, kali_last_gifts=nil, kali_known_items={},
         kali_presents={}, kali_present_source_placed=false, kali_present_completed=false,
         kali_present_sacrifice_pending=false, kali_present_source_uid=nil, kali_present_source_seen=false, kali_present_source_location=nil,
+        duat_recovery=nil, duat_recovery_spawned=false, duat_kali_check=nil,
+        beg_true_crown_healed=false,
+        duat_recovery_signature=nil, duat_recovery_empty_logged=false,
+        tusk_idol_template=nil,
+        sparrow_last_state=nil, sparrow_last_transition=nil,
         drop_configured={}, humphead_drop_configured=false,
         progression={crown=false,hedjet=false,pending_gate_items={}},
-        initialize=initialize, log=log,
+        initialize=initialize, log=log, is_duat_recovery_enabled=is_duat_recovery_enabled,
     }
+    ctx.lifecycle=lifecycle.new(log)
+    -- Keep timeout ownership in one place. All adapters should use this
+    -- instead of calling set_timeout directly.
+    ctx.defer=function(frames,label,callback) ctx.lifecycle:defer(frames,label,callback) end
+    return ctx
 end
 
 function M.reset_level(ctx)
+    ctx.lifecycle:begin_level()
     ctx.randomizer_state.level_materialized={}
     for _,name in ipairs(LEVEL_TABLES) do ctx[name]={} end
     ctx.pending_yeti_drops={}
     ctx.pending_quillback_drop=nil
+    ctx.pending_vlad_cape=nil
     ctx.pending_eggplant_crown=nil
     ctx.pending_anubis_scepter_drop=nil
     ctx.pending_anubis2_drop=nil
     ctx.pending_humphead_present=nil
+    ctx.pending_tiamat_reward=nil
     ctx.pending_kali_present_payload=nil
     ctx.spawn_replacements={}
     ctx.moon_handoff_spawning=false
+    ctx.lahamu_diagnostic_logged=false
+    ctx.duat_recovery_spawned=false
+    ctx.beg_true_crown_healed=false
 end
 
 function M.reset_run(ctx)
@@ -52,6 +70,15 @@ function M.reset_run(ctx)
     ctx.kali_present_source_location=nil
     ctx.pending_humphead_present=nil
     ctx.pending_kali_present_payload=nil
+    ctx.duat_recovery=nil
+    ctx.duat_recovery_spawned=false
+    ctx.duat_kali_check=nil
+    ctx.beg_true_crown_healed=false
+    ctx.duat_recovery_signature=nil
+    ctx.duat_recovery_empty_logged=false
+    ctx.tusk_idol_template=nil
+    ctx.sparrow_last_state=nil
+    ctx.sparrow_last_transition=nil
 end
 
 function M.save_data(ctx)
@@ -61,6 +88,11 @@ function M.save_data(ctx)
         kali_present_source_uid=ctx.kali_present_source_uid,
         kali_present_completed=ctx.kali_present_completed,
         kali_present_source_location=ctx.kali_present_source_location,
+        duat_recovery=ctx.duat_recovery,
+        duat_kali_check=ctx.duat_kali_check,
+        tusk_idol_template=ctx.tusk_idol_template,
+        sparrow_last_state=ctx.sparrow_last_state,
+        sparrow_last_transition=ctx.sparrow_last_transition,
     }
 end
 
@@ -71,6 +103,11 @@ function M.restore_data(ctx, data)
     ctx.kali_present_source_uid=data.kali_present_source_uid
     ctx.kali_present_completed=data.kali_present_completed or false
     ctx.kali_present_source_location=data.kali_present_source_location
+    ctx.duat_recovery=data.duat_recovery
+    ctx.duat_kali_check=data.duat_kali_check
+    ctx.tusk_idol_template=data.tusk_idol_template
+    ctx.sparrow_last_state=data.sparrow_last_state
+    ctx.sparrow_last_transition=data.sparrow_last_transition
 end
 
 return M

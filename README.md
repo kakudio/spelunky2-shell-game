@@ -15,8 +15,8 @@ contains individual in-game check adapters.
 - `kir_validate [seed]` prints a validated Cosmic Ocean route.
 - `kir_fuzz [count] [first_seed]` checks determinism, one-to-one reward
   assignment, and victory reachability across a seed range.
-- `kir_route [seed]` prints a selected victory trace.
 - `kir_anchors` reports unavailable Overlunky entity-name constants.
+- `kir_status` reports the current level epoch and any adapter failures.
 
 See [the logic plan](docs/randomizer-logic-plan.md),
 [dry-run victory routes](docs/victory-routes.md), and the
@@ -81,26 +81,9 @@ Access options via Modlunky 2's options menu or Overlunky (F8) → Options:
 | Option | Description |
 |--------|-------------|
 | **Enable Key Item Randomizer** | Master toggle |
-| **Shuffle Ankh** | Randomize Ankh location |
-| **Shuffle Crown/Hedjet** | Randomize Crown and Hedjet |
-| **Shuffle Excalibur** | Randomize Excalibur (replaces Excalibur Stone contents) |
-| **Shuffle Elixir** | Randomize Elixir |
-| **Shuffle Arrow of Light** | Randomize Arrow of Light (Sun Challenge reward) |
-| **Shuffle Hou Yi's Bow** | Randomize Hou Yi's Bow (Moon Challenge reward) |
-| **Shuffle Tablet of Destiny** | Randomize Tablet of Destiny |
-| **Shuffle Udjat Eye** | Randomize Udjat Eye |
-| **Shuffle Kapala** | Randomize Kapala |
-| **Shuffle Skeleton Key** | Randomize Skeleton Key |
-| **Logic Mode (Ensure Beatable)** | Validate seed is completable |
-| **Progressive Item Placement** | Tier-appropriate placement |
-| **Random Seed** | Set specific seed (0 = random) |
-| **Difficulty** | Easy/Normal/Hard/Expert presets |
-| **Generate Spoiler Log** | Print locations to console on start |
-| **Allow Duplicate Items** | Multiple copies for multiplayer |
-| **Replace Shop Items** | Key items can appear in shops |
-| **Replace Crate Contents** | Key items can spawn from crates |
-| **Replace Challenge Rewards** | Sun/Moon challenges give randomized items |
-| **Replace Kali Rewards** | Kali Altar rewards can be key items |
+| **Randomizer Seed** | Choose a fixed seed; `0` generates a new layout at run start |
+| **Test Resources** | Grants a debug loadout for adapter verification |
+| **Duat Item Recovery** | Restores held and back items at Duat's Kali altar |
 
 ## Gameplay Tips
 
@@ -161,10 +144,10 @@ The tag must exactly match the `version` in `mod.json` (for example, `0.1.0` req
 
 ## Known Issues
 
-- Excalibur Stone replacement may occasionally spawn duplicate items
-- Logic validation is basic - some seeds may still be difficult
-- Multiplayer synchronization not tested
-- Some challenge rewards may not replace correctly in co-op
+- Multiplayer event attribution is not yet verified; Kali's first-gift adapter
+  currently uses the first active player.
+- Save/reload behavior for uncollected materialized rewards still requires an
+  in-game verification pass.
 
 ## Credits
 

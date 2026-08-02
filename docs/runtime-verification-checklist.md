@@ -1,9 +1,14 @@
 # Runtime verification checklist
 
 Run `kir_tests()` in the Overlunky console after installing a build. It runs
-pure policy tests, fixed-seed determinism checks, mapping uniqueness checks,
-and 100 generated victory-route validations. `kir_tests(1000)` is the longer
-pre-release check.
+pure policy and lifecycle tests, fixed-seed determinism checks, mapping
+uniqueness checks, and 100 generated victory-route validations.
+`kir_tests(1000)` is the longer pre-release check.
+
+All delayed adapter work is level-epoch guarded. If `kir_status` reports an
+adapter failure, capture that output with the normal randomizer log; a failure
+means the native item was deliberately left untouched rather than silently
+claiming the check succeeded.
 
 The following adapters also need one in-game test whenever their code changes:
 
