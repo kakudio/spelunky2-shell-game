@@ -4,7 +4,7 @@ local lifecycle=require "check_lifecycle"
 local M={}
 
 local LEVEL_TABLES={
-    "quillback_hooks", "beg_hooks", "anubis_hooks", "anubis2_hooks",
+    "quillback_hooks", "beg_hooks", "anubis_hooks",
     "humphead_hooks", "yeti_hooks", "lahamu_hooks", "vlad_hooks", "tiamat_hooks", "eggplant_king_hooks",
     "moon_bows", "moon_hidden_bows",
 }
@@ -12,7 +12,7 @@ local LEVEL_TABLES={
 function M.new(randomizer_state, initialize, log, is_duat_recovery_enabled)
     local ctx={
         randomizer_state=randomizer_state,
-        quillback_hooks={}, beg_hooks={}, anubis_hooks={}, anubis2_hooks={},
+        quillback_hooks={}, beg_hooks={}, anubis_hooks={},
         humphead_hooks={}, yeti_hooks={}, lahamu_hooks={}, vlad_hooks={}, tiamat_hooks={}, eggplant_king_hooks={},
         pending_yeti_drops={}, spawn_replacements={}, moon_bows={}, moon_hidden_bows={},
         lahamu_diagnostic_logged=false,
@@ -22,7 +22,6 @@ function M.new(randomizer_state, initialize, log, is_duat_recovery_enabled)
         duat_recovery=nil, duat_recovery_spawned=false, duat_kali_check=nil,
         beg_true_crown_healed=false,
         duat_recovery_signature=nil, duat_recovery_empty_logged=false,
-        tusk_idol_template=nil,
         sparrow_last_state=nil, sparrow_last_transition=nil,
         drop_configured={}, humphead_drop_configured=false,
         progression={crown=false,hedjet=false,pending_gate_items={}},
@@ -44,7 +43,6 @@ function M.reset_level(ctx)
     ctx.pending_vlad_cape=nil
     ctx.pending_eggplant_crown=nil
     ctx.pending_anubis_scepter_drop=nil
-    ctx.pending_anubis2_drop=nil
     ctx.pending_humphead_present=nil
     ctx.pending_tiamat_reward=nil
     ctx.pending_kali_present_payload=nil
@@ -76,7 +74,6 @@ function M.reset_run(ctx)
     ctx.beg_true_crown_healed=false
     ctx.duat_recovery_signature=nil
     ctx.duat_recovery_empty_logged=false
-    ctx.tusk_idol_template=nil
     ctx.sparrow_last_state=nil
     ctx.sparrow_last_transition=nil
 end
@@ -90,7 +87,6 @@ function M.save_data(ctx)
         kali_present_source_location=ctx.kali_present_source_location,
         duat_recovery=ctx.duat_recovery,
         duat_kali_check=ctx.duat_kali_check,
-        tusk_idol_template=ctx.tusk_idol_template,
         sparrow_last_state=ctx.sparrow_last_state,
         sparrow_last_transition=ctx.sparrow_last_transition,
     }
@@ -105,7 +101,6 @@ function M.restore_data(ctx, data)
     ctx.kali_present_source_location=data.kali_present_source_location
     ctx.duat_recovery=data.duat_recovery
     ctx.duat_kali_check=data.duat_kali_check
-    ctx.tusk_idol_template=data.tusk_idol_template
     ctx.sparrow_last_state=data.sparrow_last_state
     ctx.sparrow_last_transition=data.sparrow_last_transition
 end

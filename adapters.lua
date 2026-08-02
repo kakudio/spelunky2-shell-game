@@ -53,16 +53,6 @@ local function finish_delivery(ctx, reward, player, uid, check)
         ctx.log("Safely delivered "..reward.." for "..check.." to player uid "..player.uid)
     end
 end
-local function apply_reward_variant(ctx,reward,uid)
-    if reward~="REWARD_TUSK_IDOL" or not uid or not ctx.tusk_idol_template then return end
-    local idol=get_entity(uid)
-    if not idol then return end
-    local template=ctx.tusk_idol_template
-    if template.animation_frame~=nil then pcall(function() idol.animation_frame=template.animation_frame end) end
-    if template.texture~=nil then pcall(function() idol.texture=template.texture end) end
-    ctx.log("Applied native Tusk Idol variant to reward uid "..uid)
-end
-
 function M.materialize(ctx, check, x, y, layer, source_uid, snap, safe_delivery)
     local allowed,reason=policy.can_replace_source(source_uid,players or {},entity_has_item_uid)
     if not allowed then
@@ -80,7 +70,6 @@ function M.materialize(ctx, check, x, y, layer, source_uid, snap, safe_delivery)
     local spawned_uid=placements.materialize(ctx.randomizer_state,ctx.log,check,x,y,layer,source_uid,snap)
     ctx.materializing=false
     if spawned_uid then ctx.lifecycle:mark(check,"materialized") end
-    apply_reward_variant(ctx,reward,spawned_uid)
     finish_delivery(ctx,reward,delivery_player,spawned_uid,check)
     local flag=reward=="REWARD_CROWN" and "crown" or reward=="REWARD_HEDJET" and "hedjet" or nil
     if spawned_uid and flag then
@@ -103,7 +92,6 @@ function M.replace_native_spawn(ctx,check,reward,x,y,layer,safe_delivery)
     local uid=spawn_entity(ent_type,x,y,layer,0,0)
     ctx.spawn_replacements[check]=nil
     if uid then ctx.lifecycle:mark(check,"materialized") end
-    apply_reward_variant(ctx,reward,uid)
     finish_delivery(ctx,reward,delivery_player,uid,check)
     return uid
 end

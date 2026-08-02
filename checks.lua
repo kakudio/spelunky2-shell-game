@@ -3,6 +3,7 @@
 local placements=require "placements"
 local adapters=require "adapters"
 local logic=require "logic"
+local sparrow=require "sparrow_adapter"
 local M={}
 local materialize=adapters.materialize
 local replace_native_spawn=adapters.replace_native_spawn
@@ -105,19 +106,6 @@ local function replace_van_reward(ctx, items)
     if closest and closest_distance<=8 then
         ctx.log(string.format("Van reward Diamond found at %.1f, %.1f (distance %.1f)",closest.x,closest.y,closest_distance))
         materialize(ctx,"CHECK_VAN_HORSING_RESCUE",closest.x,closest.y,closest.layer,closest.uid)
-    end
-end
-local function replace_tusk_idol_room(ctx)
-    -- The Tusk Idol has its own entity type. Tide Pool 4-1 is its only
-    -- source, leaving Humphead's normal 4-2 Idol to its separate adapter.
-    if state.theme~=THEME.TIDE_POOL or state.level~=1 or ctx.randomizer_state.level_materialized.CHECK_TUSK_IDOL then return end
-    local source_type=placements.type_of("ITEM_MADAMETUSK_IDOL")
-    for _,uid in ipairs(source_type and get_entities_by_type(source_type) or {}) do
-        local entity=get_entity(uid)
-        if entity then
-            materialize(ctx,"CHECK_TUSK_IDOL",entity.abs_x,entity.abs_y,entity.layer,uid,true)
-            return
-        end
     end
 end
 local function configure_drop_substitutions(ctx)
@@ -771,27 +759,6 @@ local function observe_lahamu(ctx)
     end
 end
 
-local function observe_sparrow_hideout(ctx)
-    if state.theme~=THEME.NEO_BABYLON or state.level~=1 then return end
-    local sparrow_type=placements.type_of("MONS_SPARROW")
-    if not sparrow_type then
-        ctx.log("Sparrow 6-1 diagnostic unavailable: MONS_SPARROW entity type missing")
-        return
-    end
-    local found={}
-    for _,uid in ipairs(get_entities_by_type(sparrow_type) or {}) do
-        local sparrow=get_entity(uid)
-        if sparrow then
-            table.insert(found,string.format("uid %d at %.1f, %.1f layer %s",uid,sparrow.x,sparrow.y,tostring(sparrow.layer)))
-        end
-    end
-    if #found>0 then
-        ctx.log("Sparrow 6-1 hideout entity detected: "..table.concat(found,"; "))
-    elseif state.quests and state.quests.sparrow_state>=6 then
-        ctx.log("WARNING: Sparrow quest state is "..tostring(state.quests.sparrow_state).." in 6-1, but no Sparrow entity was found")
-    end
-end
-
 local function attach_true_crown_recovery(ctx)
     local function is_cursed(player)
         local ok,value=pcall(function() return player:is_cursed() end)
@@ -879,8 +846,7 @@ function M.on_post_level_generation(ctx)
         end)
     end
     replace_van_reward(ctx,items)
-    replace_tusk_idol_room(ctx)
-    observe_sparrow_hideout(ctx)
+    sparrow.on_post_level_generation(ctx)
     attach_true_crown_recovery(ctx)
     replace_black_market_hedjet(ctx,1)
     place_kali_present_source(ctx)
@@ -990,59 +956,11 @@ function M.on_post_level_generation(ctx)
 end
 
 function M.register_spawn_hooks(ctx)
-    -- Sparrow advances the moment the game accepts the Tusk Idol at a level
-    -- exit. Watching the quest state lets us distinguish that from merely
-    -- entering Tusk's room or picking up/selling an Idol.
-    set_callback(function()
-        local quests=state.quests
-        local sparrow_state=quests and quests.sparrow_state
-        if sparrow_state==nil then return end
-        if ctx.sparrow_last_state==nil then
-            ctx.sparrow_last_state=sparrow_state
-            ctx.log("Sparrow quest state initialized: "..tostring(sparrow_state))
-        elseif ctx.sparrow_last_state~=sparrow_state then
-            local previous=ctx.sparrow_last_state
-            ctx.sparrow_last_state=sparrow_state
-            ctx.sparrow_last_transition={
-                from=previous, to=sparrow_state,
-                world=state.world, level=state.level, theme=state.theme,
-            }
-            ctx.log(string.format("Sparrow quest state changed: %s -> %s at %d-%d (theme %s)",tostring(previous),tostring(sparrow_state),state.world,state.level,tostring(state.theme)))
-        end
-    end,ON.FRAME)
+    sparrow.register(ctx)
     set_callback(function()
         snapshot_duat_recovery(ctx)
     end,ON.FRAME)
     local present_type=placements.type_of("ITEM_PRESENT")
-    local playerbag_type=placements.type_of("ITEM_PICKUP_PLAYERBAG")
-    if playerbag_type then
-        set_post_entity_spawn(function(entity)
-            if state.theme~=THEME.NEO_BABYLON or state.level~=3 or entity.layer~=LAYER.BACK
-                or ctx.randomizer_state.level_materialized.CHECK_SPARROW_VAULT then return end
-            local uid,x,y,layer=entity.uid,entity.x,entity.y,entity.layer
-            -- Sparrow configures the Player Bag after the spawn callback.
-            -- Wait one frame, then destroy that fully configured source and
-            -- make an independent mapped item.  The bag's final setup also
-            -- leaves the replacement hidden for a frame, so repair its
-            -- visible flag after that setup has completed.
-            ctx.defer(1,"Sparrow vault Player Bag replacement",function()
-                if ctx.randomizer_state.level_materialized.CHECK_SPARROW_VAULT then return end
-                local replacement_uid=materialize(ctx,"CHECK_SPARROW_VAULT",x,y,layer,uid,true)
-                ctx.log("Sparrow vault Player Bag replaced after native setup (uid "..tostring(replacement_uid)..")")
-                if replacement_uid then
-                    ctx.defer(1,"Sparrow vault replacement visibility",function()
-                        local replacement=get_entity(replacement_uid)
-                        if replacement then
-                            replacement.flags=clr_flag(replacement.flags,ENT_FLAG.INVISIBLE)
-                            if replacement.color then replacement.color.a=1 end
-                        end
-                    end)
-                end
-            end)
-        end,SPAWN_TYPE.ANY,MASK.ITEM,playerbag_type)
-    else
-        ctx.log("Sparrow vault adapter unavailable: ITEM_PICKUP_PLAYERBAG entity type missing")
-    end
     local anubis2_type=placements.type_of("MONS_ANUBIS2")
     if anubis2_type then
         -- Anubis II is created only after the player reaches the top of Duat.
@@ -1128,17 +1046,6 @@ function M.register_spawn_hooks(ctx)
         local reward=placements.reward_type(ctx.randomizer_state,pending.check)
         return replace_native_spawn(ctx,pending.check,reward,x,y,layer,true)
     end,SPAWN_TYPE.ANY,MASK.ITEM)
-
-    local jetpack_type=placements.type_of("ITEM_JETPACK")
-    if jetpack_type then
-        set_pre_entity_spawn(function(entity_type,x,y,layer)
-            local pending=ctx.pending_anubis2_drop
-            if entity_type~=jetpack_type or not pending then return nil end
-            ctx.pending_anubis2_drop=nil
-            local reward=placements.reward_type(ctx.randomizer_state,"CHECK_ANUBIS_II")
-            return replace_native_spawn(ctx,"CHECK_ANUBIS_II",reward,x,y,layer,true)
-        end,SPAWN_TYPE.ANY,MASK.ITEM,jetpack_type)
-    end
 
     local scepter_type=placements.type_of("ITEM_SCEPTER")
     if scepter_type then
