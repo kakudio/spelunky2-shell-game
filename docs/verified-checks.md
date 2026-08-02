@@ -55,6 +55,7 @@ run before treating a previous result as current.
 | `CHECK_SPARROW_VAULT` | Open exactly four vault chests and speak to Sparrow; only her completion Player Bag should change. |
 | `CHECK_EGGPLANT_KING` | Complete the Eggplant chain and defeat Yama; his native Eggplant Crown should be replaced. Moai remains a vanilla interaction, not a randomizer check. |
 | `CHECK_SUN_CHALLENGE` | Complete the Sun Challenge and verify its mapped reward. |
+| True Crown recovery | Complete Beg's True Crown check while cursed and below 4 HP; verify curse removal and health restoration. Then repeat while uncursed to confirm health is unchanged. |
 
 ## Run-level verification
 

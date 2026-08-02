@@ -27,6 +27,7 @@ The following adapters also need one in-game test whenever their code changes:
 | Tusk Dice House | Win the fifth prize. | Only the fifth prize is replaced. |
 | Mothership Plasma Cannon | Reach the Ice Caves Mothership back layer. | Only its back-layer Plasma Cannon is replaced. |
 | Lahamu | Defeat Lahamu in the Mothership. | The mapped reward appears at Lahamu's death position; forcefields still disable normally. |
+| True Crown recovery | Complete Beg's True Crown check while cursed and below four health; repeat while uncursed. | A cursed player is cured and restored to at least 4 HP; uncursed players' health is unchanged. |
 | Tusk Palace | Visit Tusk's Palace in Neo Babylon 6-3. | Its back-layer Royal Jelly is the mapped reward. |
 | Sparrow Vault | Open exactly four vault chests in Neo Babylon 6-3, then speak to Sparrow. | Her quest-completion Player Bag is the mapped reward. |
 | Eggplant King | Defeat Yama in Eggplant World. | The Eggplant Crown death drop is replaced with the mapped reward. |
