@@ -5,16 +5,19 @@ local placements=require "placements"
 local tests=require "tests"
 local runtime=require "runtime_state"
 local logger=require "logger"
+local persisted_options=options
+local options
 
 -- Option registration takes both a short label and a long description. Keep
 -- the default as the final argument; otherwise Playlunky treats it as the
 -- description and the option can be absent or unset in the overlay.
 register_option_bool("enabled","Enable Key Item Randomizer","Enable or disable all Key Item Randomizer replacements.",true)
 register_option_int("seed","Randomizer Seed (0 = generate new layout)","Choose a fixed layout seed. Set 0 to generate a new layout when the run starts.",0,0,999999)
-register_option_bool("test_resources","Test: Start with resources and progression items","Give each player the test loadout used for check verification.",true)
+register_option_button("new_seed","New Seed",function() options.seed=0 end)
 register_option_bool("duat_item_recovery","Duat Item Recovery and Kali Rewards","Restore held, equipped, and altar-dropped player items consumed by the City of Gold to Duat, and improve the special Duat altar's favor rewards.",true)
-register_option_bool("run_reports","Write Run Reports","Write a per-run issue report with seeds, spoiler, and mod logs to Mods/Data/KeyItemRandomizer/run_reports.",true)
-local options=options or {enabled=true,seed=0,test_resources=true,duat_item_recovery=true,run_reports=true}
+register_option_bool("run_reports","Generate Spoiler and Logs","Generate a per-run spoiler and log file with seeds and mod logs in Mods/Data/KeyItemRandomizer/run_reports.",true)
+register_option_bool("test_resources","Test: Start with resources and progression items","Give each player the test loadout used for check verification.",true)
+options=persisted_options or {enabled=true,seed=0,test_resources=true,duat_item_recovery=true,run_reports=true}
 if options.run_reports==nil then options.run_reports=true end
 
 local randomizer_state={seed=0,mapping=nil,initialized=false,level_materialized={}}

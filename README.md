@@ -82,13 +82,14 @@ Access options via Modlunky 2's options menu or Overlunky (F8) → Options:
 |--------|-------------|
 | **Enable Key Item Randomizer** | Master toggle |
 | **Randomizer Seed** | Choose a fixed seed; `0` generates a new layout at run start |
-| **Test Resources** | Grants a debug loadout for adapter verification |
+| **New Seed** | Sets the seed to `0`, causing the next run to generate a new layout |
 | **Duat Item Recovery and Kali Rewards** | Restores held and back items at Duat's Kali altar, and replaces its favor rewards with cumulative Player Bag and Royal Jelly rewards |
-| **Write Run Reports** | Writes seeds, spoiler mapping, and all mod logs for each run |
+| **Generate Spoiler and Logs** | Generates a per-run spoiler mapping and mod log file |
+| **Test Resources** | Grants a debug loadout for adapter verification |
 
 ## Reporting an Issue
 
-Leave **Write Run Reports** enabled. At the start of every run, the mod writes
+Leave **Generate Spoiler and Logs** enabled. At the start of every run, the mod writes
 a report to `Mods/Data/KeyItemRandomizer/run_reports/`. Attach the newest `.txt`
 file when reporting a problem; it includes the randomizer seed, the game
 adventure seed, the full spoiler mapping, and all Key Item Randomizer logs.
