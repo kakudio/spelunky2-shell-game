@@ -128,17 +128,14 @@ local function log_altar_scan_changes(ctx)
     local signature=scan_signature(recovered)
     if ctx.duat_recovery_scan_signature==signature then return end
     ctx.duat_recovery_scan_signature=signature
-    local labels=labels_for(recovered)
-    ctx.log(#labels>0 and "Duat recovery altar scan changed: "..table.concat(labels,"; ") or "Duat recovery altar scan changed: no eligible unheld items above Kali altar")
-end
-
-local function snapshot(ctx)
-    if not recovery_enabled(ctx) or state.theme~=THEME.CITY_OF_GOLD then return end
-    local recovered=scan_altar_items(ctx)
+    -- This is the authoritative snapshot.  A later scan replaces it when an
+    -- item is picked up or leaves the altar band, so it cannot accumulate
+    -- stale items.  Do not rescan at ON.TRANSITION: the game removes altar
+    -- items as part of that transition before the callback runs.
     ctx.duat_recovery=recovered
     ctx.duat_recovery_empty_logged=#recovered==0
     local labels=labels_for(recovered)
-    ctx.log(#labels>0 and "Duat recovery transition snapshot above Kali altar: "..table.concat(labels,"; ") or "Duat recovery transition snapshot found no eligible unheld item above Kali altar")
+    ctx.log(#labels>0 and "Duat recovery altar scan changed; cached snapshot: "..table.concat(labels,"; ") or "Duat recovery altar scan changed; cached snapshot is empty")
 end
 
 local function restore_items(ctx)
@@ -160,8 +157,8 @@ function M.register(ctx)
     register_favor_rewards(ctx)
     set_callback(function()
         if state.theme==THEME.CITY_OF_GOLD and state.theme_next==THEME.DUAT then
-            ctx.log("Duat recovery ON.TRANSITION at frame "..tostring(get_frame and get_frame() or -1).."; taking final altar snapshot")
-            snapshot(ctx)
+            local labels=labels_for(ctx.duat_recovery or {})
+            ctx.log(#labels>0 and "Duat recovery ON.TRANSITION at frame "..tostring(get_frame and get_frame() or -1).."; preserving cached altar snapshot: "..table.concat(labels,"; ") or "Duat recovery ON.TRANSITION at frame "..tostring(get_frame and get_frame() or -1).."; cached altar snapshot is empty")
         end
     end,ON.TRANSITION)
     set_callback(function() log_altar_scan_changes(ctx) end,ON.FRAME)
