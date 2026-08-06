@@ -28,7 +28,7 @@ local function register_group(name, title)
 end
 register_group("a_randomizer_group","Randomizer")
 register_option_bool("b_enabled","Enable Key Item Randomizer","Enable or disable all Key Item Randomizer replacements.",saved_option("b_enabled",true,"a_enabled","enabled"))
-register_option_int("c_seed","Randomizer Seed (0 = new logic)","",saved_option("c_seed",0,"b_seed","seed"),0,999999)
+register_option_int("d_seed","Randomizer Seed (0 = new logic)","",saved_option("d_seed",0,"c_seed","b_seed","seed"),0,999999)
 register_group("e_balance_group","Balance")
 register_option_bool("f_duat_item_recovery","Duat Item Recovery and Kali Rewards","Restore held, equipped, and altar-dropped player items consumed by the City of Gold to Duat, and improve the special Duat altar's favor rewards.",saved_option("f_duat_item_recovery",true,"d_duat_item_recovery","duat_item_recovery"))
 register_group("h_logging_group","Logging")
@@ -36,7 +36,7 @@ register_option_bool("i_generate_spoiler","Generate Spoiler","Include the full r
 register_option_bool("j_generate_logs","Generate Logs","Include Key Item Randomizer logs in the same per-run report.",saved_option("j_generate_logs",true,"i_run_reports","e_run_reports","run_reports"))
 register_option_bool("k_test_resources","Test: Start with resources and progression items","Give each player the test loadout used for check verification.",saved_option("k_test_resources",true,"g_test_resources","f_test_resources","test_resources"))
 options=_G.options or persisted_options or {}
-register_option_button("d_new_seed","New Seed","",function() options.c_seed=0 end)
+register_option_button("c_new_seed","New Seed","",function() options.d_seed=0 end)
 
 local randomizer_state={seed=0,mapping=nil,initialized=false,level_materialized={}}
 local runtime_context=nil
@@ -91,13 +91,13 @@ end
 -- The options menu is the seed selector. On opening the mod it shows the
 -- saved layout seed; choosing 0 explicitly requests a new one at run start.
 local saved_seed_for_menu=load_persisted_seed()
-if saved_seed_for_menu then options.c_seed=saved_seed_for_menu end
+if saved_seed_for_menu then options.d_seed=saved_seed_for_menu end
 local function initialize()
     if randomizer_state.initialized then return end
-    randomizer_state.seed=tonumber(options.c_seed) or 0
+    randomizer_state.seed=tonumber(options.d_seed) or 0
     if randomizer_state.seed==0 then
         randomizer_state.seed=now_seed()
-        options.c_seed=randomizer_state.seed
+        options.d_seed=randomizer_state.seed
         log("Seed 0 selected; generated new layout seed "..randomizer_state.seed)
     end
     persist_seed(randomizer_state.seed)
@@ -110,7 +110,7 @@ set_callback(function()
     if not options.b_enabled then return end
     -- A menu edit is applied just before the next dungeon is generated. This
     -- lets the player choose a seed (or 0 for a fresh one) before entering.
-    local requested_seed=tonumber(options.c_seed) or 0
+    local requested_seed=tonumber(options.d_seed) or 0
     if randomizer_state.initialized and (requested_seed==0 or requested_seed~=randomizer_state.seed) then
         randomizer_state.initialized=false
         randomizer_state.mapping=nil
@@ -195,13 +195,13 @@ end)
 register_console_command("kir_seed",function(args)
     local seed=console_argument(args,1,nil)
     if not seed or seed<0 or seed>999999 then print("Usage: kir_seed(seed)"); return false end
-    options.c_seed=seed; persist_seed(seed); randomizer_state.initialized=false; randomizer_state.mapping=nil
+    options.d_seed=seed; persist_seed(seed); randomizer_state.initialized=false; randomizer_state.mapping=nil
     print("[KIR] Randomizer seed set and persisted; use kir_spoiler() to apply it now."); return true
 end)
 register_console_command("kir_new_seed",function()
     local seed=now_seed()
     if seed==randomizer_state.seed then seed=(seed%999999)+1 end
-    options.c_seed=seed; persist_seed(seed); randomizer_state.initialized=false; randomizer_state.mapping=nil
+    options.d_seed=seed; persist_seed(seed); randomizer_state.initialized=false; randomizer_state.mapping=nil
     initialize()
     print("[KIR] New randomizer seed generated and persisted: "..seed)
     return seed
