@@ -24,6 +24,7 @@ function M.new(randomizer_state, initialize, log, is_kali_item_recovery_enabled,
         beg_true_crown_healed=false,
         pending_true_crown_delivery=nil,
         duat_recovery_signature=nil, duat_recovery_empty_logged=false,
+        duat_recovery_scan_signature=nil,
         sparrow_last_state=nil, sparrow_last_transition=nil,
         drop_configured={}, humphead_drop_configured=false,
         progression={crown=false,hedjet=false,pending_gate_items={}},
@@ -56,6 +57,7 @@ function M.reset_level(ctx)
     ctx.moon_handoff_spawning=false
     ctx.lahamu_diagnostic_logged=false
     ctx.duat_recovery_spawned=false
+    ctx.duat_recovery_scan_signature=nil
     ctx.beg_true_crown_healed=false
 end
 
@@ -79,6 +81,7 @@ function M.reset_run(ctx)
     ctx.beg_true_crown_healed=false
     ctx.duat_recovery_signature=nil
     ctx.duat_recovery_empty_logged=false
+    ctx.duat_recovery_scan_signature=nil
     ctx.sparrow_last_state=nil
     ctx.sparrow_last_transition=nil
 end

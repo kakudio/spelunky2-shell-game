@@ -88,8 +88,7 @@ local function allowed(ctx,t)
     return ctx.duat_recovery_altar_types[t] or false
 end
 
-local function snapshot(ctx)
-    if not recovery_enabled(ctx) or state.theme~=THEME.CITY_OF_GOLD then return end
+local function scan_altar_items(ctx)
     local recovered={}
     local altar_type=placements.type_of("FLOOR_ALTAR"); local seen={}
     for _,altar_uid in ipairs(altar_type and get_entities_by_type(altar_type) or {}) do
@@ -105,46 +104,41 @@ local function snapshot(ctx)
             end
         end end
     end
-    ctx.duat_recovery=recovered
-    ctx.duat_recovery_empty_logged=#recovered==0
-    local labels={}
-    for _,item in ipairs(recovered) do
-        table.insert(labels,string.format("%s (type %s, uid %s)",name_of(item.type),tostring(item.type),tostring(item.uid)))
-    end
-    ctx.log(#labels>0 and "Duat recovery transition snapshot above Kali altar: "..table.concat(labels,"; ") or "Duat recovery transition snapshot found no eligible unheld item above Kali altar")
+    return recovered
 end
 
-local function log_eggplant_scan(ctx)
+local function labels_for(items)
+    local labels={}
+    for _,item in ipairs(items) do
+        table.insert(labels,string.format("%s (type %s, uid %s)",name_of(item.type),tostring(item.type),tostring(item.uid)))
+    end
+    return labels
+end
+
+local function scan_signature(items)
+    local entries={}
+    for _,item in ipairs(items) do table.insert(entries,tostring(item.uid)..":"..tostring(item.type)) end
+    table.sort(entries)
+    return table.concat(entries,";")
+end
+
+local function log_altar_scan_changes(ctx)
     if not recovery_enabled(ctx) or state.theme~=THEME.CITY_OF_GOLD then return end
-    local eggplant_type=placements.type_of("ITEM_EGGPLANT")
-    local altar_type=placements.type_of("FLOOR_ALTAR")
-    local altar_uid=altar_type and get_entities_by_type(altar_type)[1] or nil
-    local altar=altar_uid and get_entity(altar_uid) or nil
-    local player_near_altar=false
-    if altar then
-        for _,player in ipairs(players or {}) do
-            if player.layer==altar.layer and math.abs(player.x-altar.x)<=4.5 and math.abs(player.y-altar.y)<=3 then
-                player_near_altar=true
-                break
-            end
-        end
-    end
-    if not player_near_altar then return end
-    local eggs=eggplant_type and get_entities_by_type(eggplant_type) or {}
-    local frame=get_frame and get_frame() or -1
-    if #eggs==0 then
-        ctx.log("Duat recovery Eggplant scan frame "..frame..": no Eggplant entity")
-        return
-    end
-    for _,uid in ipairs(eggs) do
-        local eggplant=get_entity(uid)
-        if eggplant then
-            local in_band=altar and eggplant.layer==altar.layer and not held(uid)
-                and math.abs(eggplant.x-altar.x)<=4.5 and math.abs(eggplant.y-(altar.y+1))<=0.75
-            local altar_detail=altar and string.format("altar uid %s at %.1f, %.1f; in_band=%s",tostring(altar.uid),altar.x,altar.y,tostring(in_band)) or "no Kali altar"
-            ctx.log(string.format("Duat recovery Eggplant scan frame %s: uid %s at %.1f, %.1f layer %s held=%s; %s",tostring(frame),tostring(uid),eggplant.x,eggplant.y,tostring(eggplant.layer),tostring(held(uid)),altar_detail))
-        end
-    end
+    local recovered=scan_altar_items(ctx)
+    local signature=scan_signature(recovered)
+    if ctx.duat_recovery_scan_signature==signature then return end
+    ctx.duat_recovery_scan_signature=signature
+    local labels=labels_for(recovered)
+    ctx.log(#labels>0 and "Duat recovery altar scan changed: "..table.concat(labels,"; ") or "Duat recovery altar scan changed: no eligible unheld items above Kali altar")
+end
+
+local function snapshot(ctx)
+    if not recovery_enabled(ctx) or state.theme~=THEME.CITY_OF_GOLD then return end
+    local recovered=scan_altar_items(ctx)
+    ctx.duat_recovery=recovered
+    ctx.duat_recovery_empty_logged=#recovered==0
+    local labels=labels_for(recovered)
+    ctx.log(#labels>0 and "Duat recovery transition snapshot above Kali altar: "..table.concat(labels,"; ") or "Duat recovery transition snapshot found no eligible unheld item above Kali altar")
 end
 
 local function restore_items(ctx)
@@ -165,9 +159,12 @@ end
 function M.register(ctx)
     register_favor_rewards(ctx)
     set_callback(function()
-        if state.theme==THEME.CITY_OF_GOLD and state.theme_next==THEME.DUAT then snapshot(ctx) end
+        if state.theme==THEME.CITY_OF_GOLD and state.theme_next==THEME.DUAT then
+            ctx.log("Duat recovery ON.TRANSITION at frame "..tostring(get_frame and get_frame() or -1).."; taking final altar snapshot")
+            snapshot(ctx)
+        end
     end,ON.TRANSITION)
-    set_callback(function() log_eggplant_scan(ctx) end,ON.FRAME)
+    set_callback(function() log_altar_scan_changes(ctx) end,ON.FRAME)
 end
 function M.on_post_level_generation(ctx)
     if state.theme==THEME.DUAT then restore_items(ctx)
