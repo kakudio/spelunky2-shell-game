@@ -745,42 +745,52 @@ local function observe_lahamu(ctx)
     end
 end
 
-local function attach_true_crown_recovery(ctx)
-    if ctx.is_true_crown_restoration_enabled and not ctx.is_true_crown_restoration_enabled() then return end
-    local function is_cursed(player)
-        local ok,value=pcall(function() return player:is_cursed() end)
-        if ok and type(value)=="boolean" then return value end
-        ok,value=pcall(function() return player.cursed end)
-        if ok and type(value)=="boolean" then return value end
-        ok,value=pcall(function() return test_flag(player.flags,ENT_FLAG.CURSED) end)
-        return ok and value or false
+local function is_cursed(player)
+    local ok,value=pcall(function() return player:is_cursed() end)
+    if ok and type(value)=="boolean" then return value end
+    ok,value=pcall(function() return player.cursed end)
+    if ok and type(value)=="boolean" then return value end
+    ok,value=pcall(function() return test_flag(player.flags,ENT_FLAG.CURSED) end)
+    return ok and value or false
+end
+
+local function restore_true_crown_players(ctx)
+    if (ctx.is_true_crown_restoration_enabled and not ctx.is_true_crown_restoration_enabled()) or ctx.beg_true_crown_healed then return end
+    ctx.beg_true_crown_healed=true
+    local cured=0
+    for _,player in ipairs(players or {}) do
+        if is_cursed(player) then
+            player:set_cursed(false)
+            player.health=math.max(player.health,4)
+            cured=cured+1
+        end
     end
+    ctx.log("True Crown reward delivered: cured "..cured.." player(s) and restored each to at least 4 HP")
+end
+
+local function attach_true_crown_delivery(ctx)
     local beg_type=placements.type_of("MONS_HUNDUNS_SERVANT")
     for _,uid in ipairs(beg_type and get_entities_by_type(beg_type) or {}) do
         local beg=get_entity(uid)
         if beg and not ctx.beg_hooks[uid] then
             ctx.beg_hooks[uid]=true
-            beg:set_pre_kill(function()
+            beg:set_pre_kill(function(self)
                 local quests=state.quests
                 if (ctx.is_true_crown_restoration_enabled and not ctx.is_true_crown_restoration_enabled()) or ctx.beg_true_crown_healed or not quests or (quests.beg_state or 0)<4 then return end
-                -- Delay until the native True Crown drop/check completion has
-                -- begun, so the curse applied by this encounter is cleared
-                -- afterwards rather than being immediately reapplied.
-                ctx.defer(2,"True Crown recovery",function()
-                    if ctx.beg_true_crown_healed then return end
-                    ctx.beg_true_crown_healed=true
-                    local cured=0
-                    for _,player in ipairs(players or {}) do
-                        if is_cursed(player) then
-                            player:set_cursed(false)
-                            player.health=math.max(player.health,4)
-                            cured=cured+1
-                        end
+                -- Beg's death only identifies the short window in which the
+                -- native True Crown reward is emitted.  The recovery itself
+                -- is performed only after that actual reward has spawned.
+                local pending={x=self.x,y=self.y,layer=self.layer}
+                ctx.pending_true_crown_delivery=pending
+                ctx.log(string.format("Beg True Crown reward pending at %.1f, %.1f layer %s",pending.x,pending.y,tostring(pending.layer)))
+                ctx.defer(30,"True Crown delivery window",function()
+                    if ctx.pending_true_crown_delivery==pending then
+                        ctx.pending_true_crown_delivery=nil
+                        ctx.log("Beg True Crown reward was not observed before the delivery window expired")
                     end
-                    ctx.log("True Crown check complete: cured "..cured.." player(s) and restored each to at least 4 HP")
                 end)
             end)
-            ctx.log("Attached True Crown recovery hook to Beg uid "..uid)
+            ctx.log("Attached True Crown delivery watcher to Beg uid "..uid)
         end
     end
 end
@@ -943,7 +953,7 @@ end
 
 function M.on_balance_post_level_generation(ctx)
     duat.on_post_level_generation(ctx)
-    attach_true_crown_recovery(ctx)
+    attach_true_crown_delivery(ctx)
 end
 
 function M.register_spawn_hooks(ctx)
@@ -973,6 +983,31 @@ function M.register_spawn_hooks(ctx)
             end,SPAWN_TYPE.ANY,0,entity_type)
         end
     end
+    -- Beg can be created after level generation.  Attach the delivery watcher
+    -- at spawn as well, so the True Crown reward is observed even in that
+    -- delayed case.
+    local beg_type=placements.type_of("MONS_HUNDUNS_SERVANT")
+    if beg_type then
+        set_post_entity_spawn(function()
+            attach_true_crown_delivery(ctx)
+        end,SPAWN_TYPE.ANY,0,beg_type)
+    end
+    -- `replace_drop` swaps the engine's True Crown DROP directly, so there is
+    -- no replacement callback to use.  Observe entity spawns only while a
+    -- particular Beg reward is pending, then match the configured reward at
+    -- his location before applying the optional balance restoration.
+    set_post_entity_spawn(function(entity)
+        local pending=ctx.pending_true_crown_delivery
+        if not pending or not entity or entity.layer~=pending.layer then return end
+        if math.abs(entity.x-pending.x)+math.abs(entity.y-pending.y)>12 then return end
+        local _,mapped_type=placements.reward_type(ctx.randomizer_state,"CHECK_BEG_TRUE_CROWN")
+        local native_type=placements.type_of("ITEM_PICKUP_TRUECROWN")
+        if entity.type.id~=mapped_type and entity.type.id~=native_type then return end
+        ctx.pending_true_crown_delivery=nil
+        ctx.log("Beg True Crown reward observed as uid "..entity.uid.."; scheduling restoration")
+        -- Let the native encounter finish applying its curse before curing it.
+        ctx.defer(2,"True Crown reward restoration",function() restore_true_crown_players(ctx) end)
+    end,SPAWN_TYPE.ANY,0,0)
     -- `touch` becomes zero on a player pickup. We only track the particular
     -- Crown/Hedjet entities this randomizer materialized, so other items do
     -- not accidentally satisfy the logic gate.
