@@ -120,6 +120,16 @@ local function log_eggplant_scan(ctx)
     local altar_type=placements.type_of("FLOOR_ALTAR")
     local altar_uid=altar_type and get_entities_by_type(altar_type)[1] or nil
     local altar=altar_uid and get_entity(altar_uid) or nil
+    local player_near_altar=false
+    if altar then
+        for _,player in ipairs(players or {}) do
+            if player.layer==altar.layer and math.abs(player.x-altar.x)<=4.5 and math.abs(player.y-altar.y)<=3 then
+                player_near_altar=true
+                break
+            end
+        end
+    end
+    if not player_near_altar then return end
     local eggs=eggplant_type and get_entities_by_type(eggplant_type) or {}
     local frame=get_frame and get_frame() or -1
     if #eggs==0 then
