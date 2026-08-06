@@ -15,43 +15,54 @@ local function duat_altar()
 end
 
 -- The Duat altar has three native favor rewards (cooked turkey, Bomb Bag, and
--- Bomb Box).  Treat those as successive tiers, rather than three unrelated
--- rewards, so higher favor retains every earlier benefit.
+-- Bomb Box). The Bomb Box is the repeating top-tier event, so use it to scale
+-- the Royal Jelly portion of later rewards.
 local function register_favor_rewards(ctx)
     local turkey=placements.type_of("ITEM_PICKUP_COOKEDTURKEY")
     local bomb_bag=placements.type_of("ITEM_PICKUP_BOMBBAG")
     local bomb_box=placements.type_of("ITEM_PICKUP_BOMBBOX")
-    local rope=placements.type_of("ITEM_PICKUP_ROPEPILE")
+    local player_bag=placements.type_of("ITEM_PICKUP_PLAYERBAG")
     local jelly=placements.type_of("ITEM_PICKUP_ROYALJELLY")
-    if not (turkey and bomb_bag and bomb_box and rope and jelly) then
+    if not (turkey and bomb_bag and bomb_box and player_bag and jelly) then
         ctx.log("Duat altar favor replacement unavailable: a required item type was not found")
         return
     end
 
     local tiers={
-        [turkey]={rope},
-        [bomb_bag]={rope,bomb_bag},
-        [bomb_box]={rope,bomb_bag,jelly},
+        [turkey]={level=1,bombs=5,ropes=5,jellies=0},
+        [bomb_bag]={level=2,bombs=10,ropes=10,jellies=0},
     }
-    local labels={"Rope Pile","Bomb Bag","Royal Jelly"}
+
+    local function spawn_player_bag(x,y,layer,bombs,ropes)
+        local uid=spawn_entity_nonreplaceable(player_bag,x,y,layer,0,0)
+        local entity=uid and get_entity(uid) or nil
+        local bag=entity and entity:as_playerbag() or nil
+        if bag then bag.bombs=bombs; bag.ropes=ropes end
+        return uid
+    end
 
     set_pre_entity_spawn(function(entity_type,x,y,layer)
         local rewards=tiers[entity_type]
-        if not rewards or state.theme~=THEME.DUAT then return nil end
+        if (not rewards and entity_type~=bomb_box) or state.theme~=THEME.DUAT then return nil end
         local altar=duat_altar()
         -- Native Duat altar rewards emerge immediately above the special altar.
         -- The proximity check prevents ordinary turkeys/bags/boxes in Duat from
         -- being transformed.
         if not altar or altar.layer~=layer or math.abs(x-altar.x)>2 or math.abs(y-(altar.y+1))>2 then return nil end
 
-        local spawned={}
-        local replacement_uid=nil
-        for index,reward_type in ipairs(rewards) do
-            local uid=spawn_entity_nonreplaceable(reward_type,x+(index-1)*0.65,y,layer,0,0)
-            table.insert(spawned,labels[index])
-            replacement_uid=uid
+        if entity_type==bomb_box then
+            ctx.duat_altar_top_tier_count=(ctx.duat_altar_top_tier_count or 0)+1
+            local jelly_count=ctx.duat_altar_top_tier_count
+            rewards={level=2+jelly_count,bombs=10,ropes=10,jellies=jelly_count}
         end
-        ctx.log("Duat altar favor tier "..#rewards.." granted "..table.concat(spawned,", "))
+
+        local replacement_uid=spawn_player_bag(x,y,layer,rewards.bombs,rewards.ropes)
+        for index=1,rewards.jellies do
+            spawn_entity_nonreplaceable(jelly,x+index*0.65,y,layer,0,0)
+        end
+        local contents=string.format("Player Bag (%d ropes, %d bombs)",rewards.ropes,rewards.bombs)
+        if rewards.jellies>0 then contents=contents..", "..rewards.jellies.." Royal Jelly" end
+        ctx.log("Duat altar favor level "..rewards.level.." granted "..contents)
         return replacement_uid
     end,SPAWN_TYPE.ANY,MASK.ITEM)
 end
