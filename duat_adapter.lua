@@ -15,8 +15,8 @@ local function duat_altar()
 end
 
 -- The Duat altar has three native favor rewards (cooked turkey, Bomb Bag, and
--- Bomb Box). The Bomb Box is the repeating top-tier event, so use it to scale
--- the Royal Jelly portion of later rewards.
+-- Bomb Box). The current Kali favor determines the tier, so repeated top-tier
+-- rewards scale consistently even if the altar state is restored or recreated.
 local function register_favor_rewards(ctx)
     local turkey=placements.type_of("ITEM_PICKUP_COOKEDTURKEY")
     local bomb_bag=placements.type_of("ITEM_PICKUP_BOMBBAG")
@@ -51,9 +51,9 @@ local function register_favor_rewards(ctx)
         if not altar or altar.layer~=layer or math.abs(x-altar.x)>2 or math.abs(y-(altar.y+1))>2 then return nil end
 
         if entity_type==bomb_box then
-            ctx.duat_altar_top_tier_count=(ctx.duat_altar_top_tier_count or 0)+1
-            local jelly_count=ctx.duat_altar_top_tier_count
-            rewards={level=2+jelly_count,bombs=10,ropes=10,jellies=jelly_count}
+            local favor_tier=math.floor((state.kali_favor or 0)/8)
+            local jelly_count=math.max(1,favor_tier-2)
+            rewards={level=math.max(3,favor_tier),bombs=10,ropes=10,jellies=jelly_count}
         end
 
         local replacement_uid=spawn_player_bag(x,y,layer,rewards.bombs,rewards.ropes)
@@ -62,7 +62,7 @@ local function register_favor_rewards(ctx)
         end
         local contents=string.format("Player Bag (%d ropes, %d bombs)",rewards.ropes,rewards.bombs)
         if rewards.jellies>0 then contents=contents..", "..rewards.jellies.." Royal Jelly" end
-        ctx.log("Duat altar favor level "..rewards.level.." granted "..contents)
+        ctx.log("Duat altar favor level "..rewards.level.." (Kali favor "..tostring(state.kali_favor or 0)..") granted "..contents)
         return replacement_uid
     end,SPAWN_TYPE.ANY,MASK.ITEM)
 end

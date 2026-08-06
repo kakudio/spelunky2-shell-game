@@ -21,7 +21,6 @@ function M.new(randomizer_state, initialize, log, is_duat_recovery_enabled)
         kali_presents={}, kali_present_source_placed=false, kali_present_completed=false,
         kali_present_sacrifice_pending=false, kali_present_source_uid=nil, kali_present_source_seen=false, kali_present_source_location=nil,
         duat_recovery=nil, duat_recovery_spawned=false,
-        duat_altar_top_tier_count=0,
         beg_true_crown_healed=false,
         duat_recovery_signature=nil, duat_recovery_empty_logged=false,
         sparrow_last_state=nil, sparrow_last_transition=nil,
@@ -52,7 +51,6 @@ function M.reset_level(ctx)
     ctx.moon_handoff_spawning=false
     ctx.lahamu_diagnostic_logged=false
     ctx.duat_recovery_spawned=false
-    ctx.duat_altar_top_tier_count=0
     ctx.beg_true_crown_healed=false
 end
 
