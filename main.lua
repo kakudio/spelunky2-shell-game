@@ -11,14 +11,21 @@ local options
 -- Option registration takes both a short label and a long description. Keep
 -- the default as the final argument; otherwise Playlunky treats it as the
 -- description and the option can be absent or unset in the overlay.
-register_option_bool("enabled","Enable Key Item Randomizer","Enable or disable all Key Item Randomizer replacements.",true)
-register_option_int("seed","Randomizer Seed (0 = generate new layout)","Choose a fixed layout seed. Set 0 to generate a new layout when the run starts.",0,0,999999)
-register_option_button("new_seed","New Seed",function() options.seed=0 end)
-register_option_bool("duat_item_recovery","Duat Item Recovery and Kali Rewards","Restore held, equipped, and altar-dropped player items consumed by the City of Gold to Duat, and improve the special Duat altar's favor rewards.",true)
-register_option_bool("run_reports","Generate Spoiler and Logs","Generate a per-run spoiler and log file with seeds and mod logs in Mods/Data/KeyItemRandomizer/run_reports.",true)
-register_option_bool("test_resources","Test: Start with resources and progression items","Give each player the test loadout used for check verification.",true)
-options=persisted_options or {enabled=true,seed=0,test_resources=true,duat_item_recovery=true,run_reports=true}
-if options.run_reports==nil then options.run_reports=true end
+local function saved_option(name, legacy_name, default)
+    if persisted_options and persisted_options[name]~=nil then return persisted_options[name] end
+    if persisted_options and persisted_options[legacy_name]~=nil then return persisted_options[legacy_name] end
+    return default
+end
+-- Playlunky orders settings by their internal names. Prefixing those names
+-- gives the overlay a stable, player-oriented order while saved legacy values
+-- are migrated through the defaults above.
+register_option_bool("a_enabled","Enable Key Item Randomizer","Enable or disable all Key Item Randomizer replacements.",saved_option("a_enabled","enabled",true))
+register_option_int("b_seed","Randomizer Seed (0 = generate new layout)","Choose a fixed layout seed. Set 0 to generate a new layout when the run starts.",saved_option("b_seed","seed",0),0,999999)
+register_option_bool("d_duat_item_recovery","Duat Item Recovery and Kali Rewards","Restore held, equipped, and altar-dropped player items consumed by the City of Gold to Duat, and improve the special Duat altar's favor rewards.",saved_option("d_duat_item_recovery","duat_item_recovery",true))
+register_option_bool("e_run_reports","Generate Spoiler and Logs","Generate a per-run spoiler and log file with seeds and mod logs in Mods/Data/KeyItemRandomizer/run_reports.",saved_option("e_run_reports","run_reports",true))
+register_option_bool("f_test_resources","Test: Start with resources and progression items","Give each player the test loadout used for check verification.",saved_option("f_test_resources","test_resources",true))
+options=_G.options or persisted_options or {}
+register_option_button("c_new_seed","New Seed","Set the seed to 0 so the next run generates a fresh layout.",function() options.b_seed=0 end)
 
 local randomizer_state={seed=0,mapping=nil,initialized=false,level_materialized={}}
 local runtime_context=nil
@@ -73,13 +80,13 @@ end
 -- The options menu is the seed selector. On opening the mod it shows the
 -- saved layout seed; choosing 0 explicitly requests a new one at run start.
 local saved_seed_for_menu=load_persisted_seed()
-if saved_seed_for_menu then options.seed=saved_seed_for_menu end
+if saved_seed_for_menu then options.b_seed=saved_seed_for_menu end
 local function initialize()
     if randomizer_state.initialized then return end
-    randomizer_state.seed=tonumber(options.seed) or 0
+    randomizer_state.seed=tonumber(options.b_seed) or 0
     if randomizer_state.seed==0 then
         randomizer_state.seed=now_seed()
-        options.seed=randomizer_state.seed
+        options.b_seed=randomizer_state.seed
         log("Seed 0 selected; generated new layout seed "..randomizer_state.seed)
     end
     persist_seed(randomizer_state.seed)
@@ -87,12 +94,12 @@ local function initialize()
     randomizer_state.initialized=true
     log(string.format("Initialized logic v%d, randomizer seed %d (%d checks / %d rewards)",logic.LOGIC_VERSION,randomizer_state.seed,logic.check_count(),logic.reward_count()))
 end
-runtime_context=runtime.new(randomizer_state,initialize,log,function() return options.duat_item_recovery end)
+runtime_context=runtime.new(randomizer_state,initialize,log,function() return options.d_duat_item_recovery end)
 set_callback(function()
-    if not options.enabled then return end
+    if not options.a_enabled then return end
     -- A menu edit is applied just before the next dungeon is generated. This
     -- lets the player choose a seed (or 0 for a fresh one) before entering.
-    local requested_seed=tonumber(options.seed) or 0
+    local requested_seed=tonumber(options.b_seed) or 0
     if randomizer_state.initialized and (requested_seed==0 or requested_seed~=randomizer_state.seed) then
         randomizer_state.initialized=false
         randomizer_state.mapping=nil
@@ -106,24 +113,24 @@ set_callback(function()
     checks.on_pre_level_generation(runtime_context)
 end,ON.PRE_LEVEL_GENERATION)
 local function on_post_level_generation()
-    if not options.enabled then return end
+    if not options.a_enabled then return end
     initialize()
     checks.on_post_level_generation(runtime_context)
 end
 checks.register_spawn_hooks(runtime_context)
 set_callback(on_post_level_generation,ON.POST_LEVEL_GENERATION)
-set_callback(function() if options.enabled and not randomizer_state.initialized then initialize() end end,ON.START)
+set_callback(function() if options.a_enabled and not randomizer_state.initialized then initialize() end end,ON.START)
 set_callback(function()
-    if not options.enabled then return end
+    if not options.a_enabled then return end
     -- The mapping is seed-stable, but collected progression belongs to one
     -- run only. ON.START is also used by shortcuts/debug starts, which may
     -- not begin in 1-1, so reset unconditionally here.
     runtime.reset_run(runtime_context)
-    local report_path=logger.begin_run(randomizer_state,logic,options.run_reports)
+    local report_path=logger.begin_run(randomizer_state,logic,options.e_run_reports)
     if report_path then log("Run report started: Mods/Data/KeyItemRandomizer/"..report_path)
-    elseif options.run_reports then log("WARNING: could not create this run's report file") end
+    elseif options.e_run_reports then log("WARNING: could not create this run's report file") end
     log("Reset Crown/Hedjet progression for new run")
-    if options.test_resources then
+    if options.f_test_resources then
         for _,player in ipairs(players) do
             player.health=50
             player.inventory.bombs=50
@@ -177,13 +184,13 @@ end)
 register_console_command("kir_seed",function(args)
     local seed=console_argument(args,1,nil)
     if not seed or seed<0 or seed>999999 then print("Usage: kir_seed(seed)"); return false end
-    options.seed=seed; persist_seed(seed); randomizer_state.initialized=false; randomizer_state.mapping=nil
+    options.b_seed=seed; persist_seed(seed); randomizer_state.initialized=false; randomizer_state.mapping=nil
     print("[KIR] Randomizer seed set and persisted; use kir_spoiler() to apply it now."); return true
 end)
 register_console_command("kir_new_seed",function()
     local seed=now_seed()
     if seed==randomizer_state.seed then seed=(seed%999999)+1 end
-    options.seed=seed; persist_seed(seed); randomizer_state.initialized=false; randomizer_state.mapping=nil
+    options.b_seed=seed; persist_seed(seed); randomizer_state.initialized=false; randomizer_state.mapping=nil
     initialize()
     print("[KIR] New randomizer seed generated and persisted: "..seed)
     return seed
