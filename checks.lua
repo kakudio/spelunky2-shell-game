@@ -746,6 +746,7 @@ local function observe_lahamu(ctx)
 end
 
 local function attach_true_crown_recovery(ctx)
+    if ctx.is_true_crown_restoration_enabled and not ctx.is_true_crown_restoration_enabled() then return end
     local function is_cursed(player)
         local ok,value=pcall(function() return player:is_cursed() end)
         if ok and type(value)=="boolean" then return value end
@@ -761,7 +762,7 @@ local function attach_true_crown_recovery(ctx)
             ctx.beg_hooks[uid]=true
             beg:set_pre_kill(function()
                 local quests=state.quests
-                if ctx.beg_true_crown_healed or not quests or (quests.beg_state or 0)<4 then return end
+                if (ctx.is_true_crown_restoration_enabled and not ctx.is_true_crown_restoration_enabled()) or ctx.beg_true_crown_healed or not quests or (quests.beg_state or 0)<4 then return end
                 -- Delay until the native True Crown drop/check completion has
                 -- begun, so the curse applied by this encounter is cleared
                 -- afterwards rather than being immediately reapplied.
@@ -785,7 +786,6 @@ local function attach_true_crown_recovery(ctx)
 end
 
 function M.on_post_level_generation(ctx)
-    duat.on_post_level_generation(ctx)
     -- Present identities are level-local. Clearing them here prevents an item
     -- left on a prior level from being mistaken for a sacrifice on this one.
     ctx.kali_presents={}
@@ -834,7 +834,6 @@ function M.on_post_level_generation(ctx)
     end
     replace_van_reward(ctx,items)
     sparrow.on_post_level_generation(ctx)
-    attach_true_crown_recovery(ctx)
     replace_black_market_hedjet(ctx,1)
     place_kali_present_source(ctx)
     if theme==THEME.TIDE_POOL then
@@ -940,6 +939,11 @@ function M.on_post_level_generation(ctx)
     -- from unrelated sources. Eggplant World has its own theme, so detect the
     -- boss type directly instead of depending on a theme enum.
     attach_delayed_death_reward(ctx,"MONS_YAMA","CHECK_EGGPLANT_KING","eggplant_king_hooks","pending_eggplant_crown","Eggplant King Crown")
+end
+
+function M.on_balance_post_level_generation(ctx)
+    duat.on_post_level_generation(ctx)
+    attach_true_crown_recovery(ctx)
 end
 
 function M.register_spawn_hooks(ctx)

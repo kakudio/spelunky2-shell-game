@@ -10,7 +10,7 @@ local LEVEL_TABLES={
     "sun_challenge_bags",
 }
 
-function M.new(randomizer_state, initialize, log, is_duat_recovery_enabled)
+function M.new(randomizer_state, initialize, log, is_kali_item_recovery_enabled, is_balanced_duat_kali_rewards_enabled, is_true_crown_restoration_enabled)
     local ctx={
         randomizer_state=randomizer_state,
         quillback_hooks={}, beg_hooks={}, anubis_hooks={},
@@ -26,7 +26,10 @@ function M.new(randomizer_state, initialize, log, is_duat_recovery_enabled)
         sparrow_last_state=nil, sparrow_last_transition=nil,
         drop_configured={}, humphead_drop_configured=false,
         progression={crown=false,hedjet=false,pending_gate_items={}},
-        initialize=initialize, log=log, is_duat_recovery_enabled=is_duat_recovery_enabled,
+        initialize=initialize, log=log,
+        is_kali_item_recovery_enabled=is_kali_item_recovery_enabled,
+        is_balanced_duat_kali_rewards_enabled=is_balanced_duat_kali_rewards_enabled,
+        is_true_crown_restoration_enabled=is_true_crown_restoration_enabled,
     }
     ctx.lifecycle=lifecycle.new(log)
     -- Keep timeout ownership in one place. All adapters should use this

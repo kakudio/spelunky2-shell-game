@@ -9,7 +9,12 @@ local BACK={"ITEM_CAPE","ITEM_VLADS_CAPE","ITEM_JETPACK","ITEM_HOVERPACK","ITEM_
 -- excluded so this does not become general loose-item transport into Duat.
 local NEAR={"ITEM_EXCALIBUR","ITEM_SCEPTER","ITEM_HOUYIBOW","ITEM_LIGHT_ARROW","ITEM_PLASMACANNON","ITEM_CLONEGUN","ITEM_TELEPORTER","ITEM_MATTOCK","ITEM_SHOTGUN","ITEM_FREEZERAY","ITEM_WEBGUN","ITEM_CAMERA","ITEM_CROSSBOW","ITEM_MACHETE","ITEM_BOOMERANG","ITEM_EGGPLANT"}
 
-local function enabled(ctx) return not ctx.is_duat_recovery_enabled or ctx.is_duat_recovery_enabled() end
+local function recovery_enabled(ctx)
+    return not ctx.is_kali_item_recovery_enabled or ctx.is_kali_item_recovery_enabled()
+end
+local function favor_rewards_enabled(ctx)
+    return not ctx.is_balanced_duat_kali_rewards_enabled or ctx.is_balanced_duat_kali_rewards_enabled()
+end
 local function name_of(t) local ok,name=pcall(get_entity_name,t,true); return ok and name or tostring(t) end
 local function duat_altar()
     local t=placements.type_of("FLOOR_DUAT_ALTAR")
@@ -45,7 +50,7 @@ local function register_favor_rewards(ctx)
     end
 
     set_pre_entity_spawn(function(entity_type,x,y,layer)
-        if not enabled(ctx) then return nil end
+        if not favor_rewards_enabled(ctx) then return nil end
         local rewards=tiers[entity_type]
         if (not rewards and entity_type~=bomb_box) or state.theme~=THEME.DUAT then return nil end
         local altar=duat_altar()
@@ -84,7 +89,7 @@ local function allowed(ctx,t)
 end
 
 local function snapshot(ctx)
-    if not enabled(ctx) or state.theme~=THEME.CITY_OF_GOLD then return end
+    if not recovery_enabled(ctx) or state.theme~=THEME.CITY_OF_GOLD then return end
     local recovered={}
     for index,player in ipairs(players or {}) do
         local item=player:get_held_entity()
@@ -120,7 +125,7 @@ local function snapshot(ctx)
 end
 
 local function restore_items(ctx)
-    if not enabled(ctx) then ctx.duat_recovery=nil; return end
+    if not recovery_enabled(ctx) then ctx.duat_recovery=nil; return end
     if state.theme~=THEME.DUAT or ctx.duat_recovery_spawned then return end
     ctx.duat_recovery_spawned=true; local recovered=ctx.duat_recovery
     if not recovered or #recovered==0 then ctx.log("Duat item recovery reached Duat: no captured items to restore"); return end

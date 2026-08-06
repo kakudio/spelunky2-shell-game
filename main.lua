@@ -30,11 +30,13 @@ register_group("a_randomizer_group","Randomizer")
 register_option_bool("b_enabled","Enable Key Item Randomizer","Enable or disable all Key Item Randomizer replacements.",saved_option("b_enabled",true,"a_enabled","enabled"))
 register_option_int("d_seed","Randomizer Seed (0 = new logic)","",saved_option("d_seed",0,"c_seed","b_seed","seed"),0,999999)
 register_group("e_balance_group","Balance")
-register_option_bool("f_duat_item_recovery","Duat Item Recovery and Kali Rewards","Restore held, equipped, and altar-dropped player items consumed by the City of Gold to Duat, and improve the special Duat altar's favor rewards.",saved_option("f_duat_item_recovery",true,"d_duat_item_recovery","duat_item_recovery"))
-register_group("h_logging_group","Logging")
-register_option_bool("i_generate_spoiler","Generate Spoiler","Include the full randomized check mapping in the per-run report.",saved_option("i_generate_spoiler",true,"i_run_reports","e_run_reports","run_reports"))
-register_option_bool("j_generate_logs","Generate Logs","Include Key Item Randomizer logs in the same per-run report.",saved_option("j_generate_logs",true,"i_run_reports","e_run_reports","run_reports"))
-register_option_bool("k_test_resources","Test: Start with resources and progression items","Give each player the test loadout used for check verification.",saved_option("k_test_resources",true,"g_test_resources","f_test_resources","test_resources"))
+register_option_bool("f_kali_item_recovery","Kali Item Recovery","Restore held, equipped, and allowed altar-dropped items from the City of Gold to Duat.",saved_option("f_kali_item_recovery",true,"f_duat_item_recovery","d_duat_item_recovery","duat_item_recovery"))
+register_option_bool("g_balanced_duat_kali_rewards","Balanced Duat Kali Rewards","Replace the special Duat altar's favor rewards with balanced Player Bag and Royal Jelly rewards.",saved_option("g_balanced_duat_kali_rewards",true,"f_duat_item_recovery","d_duat_item_recovery","duat_item_recovery"))
+register_option_bool("h_true_crown_restoration","True Crown Restoration","Remove Beg's curse and restore the player to at least 4 HP after the True Crown encounter.",saved_option("h_true_crown_restoration",true))
+register_group("i_logging_group","Logging")
+register_option_bool("j_generate_spoiler","Generate Spoiler","Include the full randomized check mapping in the per-run report.",saved_option("j_generate_spoiler",true,"i_generate_spoiler","i_run_reports","e_run_reports","run_reports"))
+register_option_bool("k_generate_logs","Generate Logs","Include Key Item Randomizer logs in the same per-run report.",saved_option("k_generate_logs",true,"j_generate_logs","i_run_reports","e_run_reports","run_reports"))
+register_option_bool("l_test_resources","Test: Start with resources and progression items","Give each player the test loadout used for check verification.",saved_option("l_test_resources",true,"k_test_resources","g_test_resources","f_test_resources","test_resources"))
 options=_G.options or persisted_options or {}
 register_option_button("c_new_seed","New Seed","",function() options.d_seed=0 end)
 
@@ -105,8 +107,12 @@ local function initialize()
     randomizer_state.initialized=true
     log(string.format("Initialized logic v%d, randomizer seed %d (%d checks / %d rewards)",logic.LOGIC_VERSION,randomizer_state.seed,logic.check_count(),logic.reward_count()))
 end
-runtime_context=runtime.new(randomizer_state,initialize,log,function() return options.f_duat_item_recovery end)
+runtime_context=runtime.new(randomizer_state,initialize,log,
+    function() return options.f_kali_item_recovery end,
+    function() return options.g_balanced_duat_kali_rewards end,
+    function() return options.h_true_crown_restoration end)
 set_callback(function()
+    runtime.reset_level(runtime_context)
     if not options.b_enabled then return end
     -- A menu edit is applied just before the next dungeon is generated. This
     -- lets the player choose a seed (or 0 for a fresh one) before entering.
@@ -120,10 +126,10 @@ set_callback(function()
     -- Begin the new epoch before that work exists; doing this in POST level
     -- generation cancelled valid callbacks such as Moon Challenge's Bow
     -- handoff as soon as the level finished building.
-    runtime.reset_level(runtime_context)
     checks.on_pre_level_generation(runtime_context)
 end,ON.PRE_LEVEL_GENERATION)
 local function on_post_level_generation()
+    checks.on_balance_post_level_generation(runtime_context)
     if not options.b_enabled then return end
     initialize()
     checks.on_post_level_generation(runtime_context)
@@ -132,16 +138,16 @@ checks.register_spawn_hooks(runtime_context)
 set_callback(on_post_level_generation,ON.POST_LEVEL_GENERATION)
 set_callback(function() if options.b_enabled and not randomizer_state.initialized then initialize() end end,ON.START)
 set_callback(function()
-    if not options.b_enabled then return end
     -- The mapping is seed-stable, but collected progression belongs to one
     -- run only. ON.START is also used by shortcuts/debug starts, which may
     -- not begin in 1-1, so reset unconditionally here.
     runtime.reset_run(runtime_context)
-    local report_path=logger.begin_run(randomizer_state,logic,options.i_generate_spoiler,options.j_generate_logs)
+    if not options.b_enabled then return end
+    local report_path=logger.begin_run(randomizer_state,logic,options.j_generate_spoiler,options.k_generate_logs)
     if report_path then log("Run report started: Mods/Data/KeyItemRandomizer/"..report_path)
-    elseif options.i_generate_spoiler or options.j_generate_logs then log("WARNING: could not create this run's report file") end
+    elseif options.j_generate_spoiler or options.k_generate_logs then log("WARNING: could not create this run's report file") end
     log("Reset Crown/Hedjet progression for new run")
-    if options.k_test_resources then
+    if options.l_test_resources then
         for _,player in ipairs(players) do
             player.health=50
             player.inventory.bombs=50
