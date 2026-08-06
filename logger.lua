@@ -9,8 +9,8 @@ function M.log(message)
     if M.overlay_runtime_logs then print("[KeyItemRandomizer] "..message) end
 end
 
-function M.begin_run(randomizer_state,logic,write_reports)
-    return run_report.begin(randomizer_state,logic,write_reports)
+function M.begin_run(randomizer_state,logic,write_spoiler,write_logs)
+    return run_report.begin(randomizer_state,logic,write_spoiler,write_logs)
 end
 
 function M.report_path() return run_report.path() end

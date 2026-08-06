@@ -31,9 +31,10 @@ register_option_bool("b_enabled","Enable Key Item Randomizer","Enable or disable
 register_option_int("c_seed","Randomizer Seed (0 = new logic)","",saved_option("c_seed",0,"b_seed","seed"),0,999999)
 register_group("e_balance_group","Balance")
 register_option_bool("f_duat_item_recovery","Duat Item Recovery and Kali Rewards","Restore held, equipped, and altar-dropped player items consumed by the City of Gold to Duat, and improve the special Duat altar's favor rewards.",saved_option("f_duat_item_recovery",true,"d_duat_item_recovery","duat_item_recovery"))
-register_option_bool("g_test_resources","Test: Start with resources and progression items","Give each player the test loadout used for check verification.",saved_option("g_test_resources",true,"f_test_resources","test_resources"))
 register_group("h_logging_group","Logging")
-register_option_bool("i_run_reports","Generate Spoiler and Logs","Generate a per-run spoiler and log file with seeds and mod logs in Mods/Data/KeyItemRandomizer/run_reports.",saved_option("i_run_reports",true,"e_run_reports","run_reports"))
+register_option_bool("i_generate_spoiler","Generate Spoiler","Include the full randomized check mapping in the per-run report.",saved_option("i_generate_spoiler",true,"i_run_reports","e_run_reports","run_reports"))
+register_option_bool("j_generate_logs","Generate Logs","Include Key Item Randomizer logs in the same per-run report.",saved_option("j_generate_logs",true,"i_run_reports","e_run_reports","run_reports"))
+register_option_bool("k_test_resources","Test: Start with resources and progression items","Give each player the test loadout used for check verification.",saved_option("k_test_resources",true,"g_test_resources","f_test_resources","test_resources"))
 options=_G.options or persisted_options or {}
 register_option_button("d_new_seed","New Seed","",function() options.c_seed=0 end)
 
@@ -136,11 +137,11 @@ set_callback(function()
     -- run only. ON.START is also used by shortcuts/debug starts, which may
     -- not begin in 1-1, so reset unconditionally here.
     runtime.reset_run(runtime_context)
-    local report_path=logger.begin_run(randomizer_state,logic,options.i_run_reports)
+    local report_path=logger.begin_run(randomizer_state,logic,options.i_generate_spoiler,options.j_generate_logs)
     if report_path then log("Run report started: Mods/Data/KeyItemRandomizer/"..report_path)
-    elseif options.i_run_reports then log("WARNING: could not create this run's report file") end
+    elseif options.i_generate_spoiler or options.j_generate_logs then log("WARNING: could not create this run's report file") end
     log("Reset Crown/Hedjet progression for new run")
-    if options.g_test_resources then
+    if options.k_test_resources then
         for _,player in ipairs(players) do
             player.health=50
             player.inventory.bombs=50

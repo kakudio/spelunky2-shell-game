@@ -1,7 +1,7 @@
 -- Per-run diagnostic reports for player issue submissions.
 
 local REPORT_LIMIT=30
-local M={pending_logs={},run_number=0,filename=nil,enabled=true,write_failed=false}
+local M={pending_logs={},run_number=0,filename=nil,enabled=true,write_logs=true,write_failed=false}
 
 local function append(line)
     if not M.enabled or not M.filename then return end
@@ -32,12 +32,17 @@ end
 
 function M.log(message)
     local line=string.format("[%d] %s",os.time(),message)
-    if M.filename and M.enabled then append(line)
-    else table.insert(M.pending_logs,line) end
+    if M.filename then
+        if M.enabled and M.write_logs then append(line) end
+    else
+        table.insert(M.pending_logs,line)
+    end
 end
 
-function M.begin(randomizer_state,logic,enabled)
-    M.enabled=enabled~=false
+function M.begin(randomizer_state,logic,write_spoiler,write_logs)
+    write_spoiler=write_spoiler~=false
+    M.write_logs=write_logs~=false
+    M.enabled=write_spoiler or M.write_logs
     M.filename=nil
     M.write_failed=false
     if not M.enabled then M.pending_logs={}; return nil end
@@ -53,14 +58,18 @@ function M.begin(randomizer_state,logic,enabled)
     file:write("Game adventure run seed: ",game_seed(),"\n")
     file:write("Logic version: ",tostring(logic.LOGIC_VERSION),"\n")
     file:write("Generated: ",tostring(os.time()),"\n\n")
-    file:write("Spoiler mapping:\n")
-    for _,check in ipairs(logic.CHECKS) do
-        if check.shuffle~=false then
-            file:write(string.format("  %s -> %s\n",check.id,randomizer_state.mapping and randomizer_state.mapping[check.id] or "NONE"))
+    if write_spoiler then
+        file:write("Spoiler mapping:\n")
+        for _,check in ipairs(logic.CHECKS) do
+            if check.shuffle~=false then
+                file:write(string.format("  %s -> %s\n",check.id,randomizer_state.mapping and randomizer_state.mapping[check.id] or "NONE"))
+            end
         end
     end
-    file:write("\nMod log:\n")
-    for _,line in ipairs(M.pending_logs) do file:write(line,"\n") end
+    if M.write_logs then
+        file:write("\nMod log:\n")
+        for _,line in ipairs(M.pending_logs) do file:write(line,"\n") end
+    end
     M.pending_logs={}
     file:close()
     prune_old_reports()
