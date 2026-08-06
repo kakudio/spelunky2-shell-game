@@ -168,9 +168,10 @@ set_callback(function()
             grant_test_item(player,vlads_cape_type,"Vlad's Cape")
             grant_test_scepter(player)
             grant_test_tusk_idol(player)
+            grant_test_floor_item(player,placements.type_of("ITEM_EGGPLANT"),"Eggplant")
             runtime_context.progression.crown=true
         end
-        log("Test resources granted: $1,000,000, 50 health/bombs/ropes, Udjat Eye, Ankh, Crown, Skeleton Key, Alien Compass, Tablet of Destiny, Spike Shoes, Excalibur, Vlad's Cape, and a Scepter and Tusk Idol at each player's position")
+        log("Test resources granted: $1,000,000, 50 health/bombs/ropes, Udjat Eye, Ankh, Crown, Skeleton Key, Alien Compass, Tablet of Destiny, Spike Shoes, Excalibur, Vlad's Cape, and a Scepter, Tusk Idol, and Eggplant at each player's position")
     end
     checks.replace_excalibur_if_gated(runtime_context)
 end,ON.START)
