@@ -13,9 +13,11 @@ register_option_bool("enabled","Enable Key Item Randomizer","Enable or disable a
 register_option_int("seed","Randomizer Seed (0 = generate new layout)","Choose a fixed layout seed. Set 0 to generate a new layout when the run starts.",0,0,999999)
 register_option_bool("test_resources","Test: Start with resources and progression items","Give each player the test loadout used for check verification.",true)
 register_option_bool("duat_item_recovery","Duat Item Recovery","Restore held, equipped, and altar-dropped player items consumed by the City of Gold to Duat transition at the special Duat altar.",true)
+register_option_bool("improved_duat_kali_rewards","Improved Duat Kali Rewards","Replace the special Duat altar's favor rewards with cumulative Player Bag and Royal Jelly rewards.",false)
 register_option_bool("run_reports","Write Run Reports","Write a per-run issue report with seeds, spoiler, and mod logs to Mods/Data/KeyItemRandomizer/run_reports.",true)
-local options=options or {enabled=true,seed=0,test_resources=true,duat_item_recovery=true,run_reports=true}
+local options=options or {enabled=true,seed=0,test_resources=true,duat_item_recovery=true,improved_duat_kali_rewards=false,run_reports=true}
 if options.run_reports==nil then options.run_reports=true end
+if options.improved_duat_kali_rewards==nil then options.improved_duat_kali_rewards=false end
 
 local randomizer_state={seed=0,mapping=nil,initialized=false,level_materialized={}}
 local runtime_context=nil
@@ -84,7 +86,9 @@ local function initialize()
     randomizer_state.initialized=true
     log(string.format("Initialized logic v%d, randomizer seed %d (%d checks / %d rewards)",logic.LOGIC_VERSION,randomizer_state.seed,logic.check_count(),logic.reward_count()))
 end
-runtime_context=runtime.new(randomizer_state,initialize,log,function() return options.duat_item_recovery end)
+runtime_context=runtime.new(randomizer_state,initialize,log,
+    function() return options.duat_item_recovery end,
+    function() return options.improved_duat_kali_rewards end)
 set_callback(function()
     if not options.enabled then return end
     -- A menu edit is applied just before the next dungeon is generated. This
