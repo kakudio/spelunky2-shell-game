@@ -83,8 +83,7 @@ Access options via Modlunky 2's options menu or Overlunky (F8) → Options:
 | **Enable Key Item Randomizer** | Master toggle |
 | **Randomizer Seed** | Choose a fixed seed; `0` generates a new layout at run start |
 | **Test Resources** | Grants a debug loadout for adapter verification |
-| **Duat Item Recovery** | Restores held and back items at Duat's Kali altar |
-| **Improved Duat Kali Rewards** | Replaces Duat altar favor rewards with cumulative Player Bag and Royal Jelly rewards |
+| **Duat Item Recovery and Kali Rewards** | Restores held and back items at Duat's Kali altar, and replaces its favor rewards with cumulative Player Bag and Royal Jelly rewards |
 | **Write Run Reports** | Writes seeds, spoiler mapping, and all mod logs for each run |
 
 ## Reporting an Issue
