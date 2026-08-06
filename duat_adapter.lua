@@ -4,7 +4,10 @@ local placements=require "placements"
 local M={}
 
 local BACK={"ITEM_CAPE","ITEM_VLADS_CAPE","ITEM_JETPACK","ITEM_HOVERPACK","ITEM_POWERPACK","ITEM_TELEPORTER_BACKPACK"}
-local NEAR={"ITEM_EXCALIBUR","ITEM_SCEPTER","ITEM_HOUYIBOW","ITEM_LIGHT_ARROW","ITEM_PLASMACANNON","ITEM_CLONEGUN","ITEM_TELEPORTER","ITEM_MATTOCK","ITEM_SHOTGUN","ITEM_FREEZERAY","ITEM_WEBGUN","ITEM_CAMERA","ITEM_CROSSBOW","ITEM_MACHETE","ITEM_BOOMERANG","ITEM_MADAMETUSK_IDOL","ITEM_IDOL","ITEM_PICKUP_ELIXIR","ITEM_PICKUP_TABLETOFDESTINY","ITEM_PICKUP_UDJATEYE","ITEM_PICKUP_ANKH","ITEM_PICKUP_HEDJET","ITEM_PICKUP_CROWN","ITEM_PICKUP_SKELETON_KEY","ITEM_PICKUP_SPECIALCOMPASS","ITEM_PICKUP_COMPASS"}
+-- Only durable tools and the Eggplant are recovered when deliberately placed
+-- near the City of Gold altar. Quest items and ordinary collectibles remain
+-- excluded so this does not become general loose-item transport into Duat.
+local NEAR={"ITEM_EXCALIBUR","ITEM_SCEPTER","ITEM_HOUYIBOW","ITEM_LIGHT_ARROW","ITEM_PLASMACANNON","ITEM_CLONEGUN","ITEM_TELEPORTER","ITEM_MATTOCK","ITEM_SHOTGUN","ITEM_FREEZERAY","ITEM_WEBGUN","ITEM_CAMERA","ITEM_CROSSBOW","ITEM_MACHETE","ITEM_BOOMERANG","ITEM_EGGPLANT"}
 
 local function enabled(ctx) return not ctx.is_duat_recovery_enabled or ctx.is_duat_recovery_enabled() end
 local function name_of(t) local ok,name=pcall(get_entity_name,t,true); return ok and name or tostring(t) end
