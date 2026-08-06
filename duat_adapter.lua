@@ -114,6 +114,29 @@ local function snapshot(ctx)
     ctx.log(#labels>0 and "Duat recovery transition snapshot above Kali altar: "..table.concat(labels,"; ") or "Duat recovery transition snapshot found no eligible unheld item above Kali altar")
 end
 
+local function log_eggplant_scan(ctx)
+    if not recovery_enabled(ctx) or state.theme~=THEME.CITY_OF_GOLD then return end
+    local eggplant_type=placements.type_of("ITEM_EGGPLANT")
+    local altar_type=placements.type_of("FLOOR_ALTAR")
+    local altar_uid=altar_type and get_entities_by_type(altar_type)[1] or nil
+    local altar=altar_uid and get_entity(altar_uid) or nil
+    local eggs=eggplant_type and get_entities_by_type(eggplant_type) or {}
+    local frame=get_frame and get_frame() or -1
+    if #eggs==0 then
+        ctx.log("Duat recovery Eggplant scan frame "..frame..": no Eggplant entity")
+        return
+    end
+    for _,uid in ipairs(eggs) do
+        local eggplant=get_entity(uid)
+        if eggplant then
+            local in_band=altar and eggplant.layer==altar.layer and not held(uid)
+                and math.abs(eggplant.x-altar.x)<=4.5 and math.abs(eggplant.y-(altar.y+1))<=0.75
+            local altar_detail=altar and string.format("altar uid %s at %.1f, %.1f; in_band=%s",tostring(altar.uid),altar.x,altar.y,tostring(in_band)) or "no Kali altar"
+            ctx.log(string.format("Duat recovery Eggplant scan frame %s: uid %s at %.1f, %.1f layer %s held=%s; %s",tostring(frame),tostring(uid),eggplant.x,eggplant.y,tostring(eggplant.layer),tostring(held(uid)),altar_detail))
+        end
+    end
+end
+
 local function restore_items(ctx)
     if not recovery_enabled(ctx) then ctx.duat_recovery=nil; return end
     if state.theme~=THEME.DUAT or ctx.duat_recovery_spawned then return end
@@ -134,6 +157,7 @@ function M.register(ctx)
     set_callback(function()
         if state.theme==THEME.CITY_OF_GOLD and state.theme_next==THEME.DUAT then snapshot(ctx) end
     end,ON.TRANSITION)
+    set_callback(function() log_eggplant_scan(ctx) end,ON.FRAME)
 end
 function M.on_post_level_generation(ctx)
     if state.theme==THEME.DUAT then restore_items(ctx)
