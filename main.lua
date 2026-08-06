@@ -28,14 +28,14 @@ local function register_group(name, title)
 end
 register_group("a_randomizer_group","Randomizer")
 register_option_bool("b_enabled","Enable Key Item Randomizer","Enable or disable all Key Item Randomizer replacements.",saved_option("b_enabled",true,"a_enabled","enabled"))
-register_option_int("c_seed","Randomizer Seed (0 = generate new layout)","Choose a fixed layout seed. Set 0 to generate a new layout when the run starts.",saved_option("c_seed",0,"b_seed","seed"),0,999999)
+register_option_int("c_seed","Randomizer Seed (0 = new logic)","",saved_option("c_seed",0,"b_seed","seed"),0,999999)
 register_group("e_balance_group","Balance")
 register_option_bool("f_duat_item_recovery","Duat Item Recovery and Kali Rewards","Restore held, equipped, and altar-dropped player items consumed by the City of Gold to Duat, and improve the special Duat altar's favor rewards.",saved_option("f_duat_item_recovery",true,"d_duat_item_recovery","duat_item_recovery"))
 register_option_bool("g_test_resources","Test: Start with resources and progression items","Give each player the test loadout used for check verification.",saved_option("g_test_resources",true,"f_test_resources","test_resources"))
 register_group("h_logging_group","Logging")
 register_option_bool("i_run_reports","Generate Spoiler and Logs","Generate a per-run spoiler and log file with seeds and mod logs in Mods/Data/KeyItemRandomizer/run_reports.",saved_option("i_run_reports",true,"e_run_reports","run_reports"))
 options=_G.options or persisted_options or {}
-register_option_button("d_new_seed","New Seed","Set the seed to 0 so the next run generates a fresh layout.",function() options.c_seed=0 end)
+register_option_button("d_new_seed","New Seed","",function() options.c_seed=0 end)
 
 local randomizer_state={seed=0,mapping=nil,initialized=false,level_materialized={}}
 local runtime_context=nil
