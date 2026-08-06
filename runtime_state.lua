@@ -20,7 +20,7 @@ function M.new(randomizer_state, initialize, log, is_kali_item_recovery_enabled,
         moon_handoff_spawning=false, kali_last_gifts=nil, kali_known_items={},
         kali_presents={}, kali_present_source_placed=false, kali_present_completed=false,
         kali_present_sacrifice_pending=false, kali_present_source_uid=nil, kali_present_source_seen=false, kali_present_source_location=nil,
-        duat_recovery=nil, duat_recovery_spawned=false,
+        duat_recovery=nil, duat_recovery_seen={}, duat_recovery_spawned=false,
         beg_true_crown_healed=false,
         duat_recovery_signature=nil, duat_recovery_empty_logged=false,
         sparrow_last_state=nil, sparrow_last_transition=nil,
@@ -73,6 +73,7 @@ function M.reset_run(ctx)
     ctx.pending_humphead_present=nil
     ctx.pending_kali_present_payload=nil
     ctx.duat_recovery=nil
+    ctx.duat_recovery_seen={}
     ctx.duat_recovery_spawned=false
     ctx.beg_true_crown_healed=false
     ctx.duat_recovery_signature=nil

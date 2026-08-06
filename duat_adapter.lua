@@ -91,14 +91,6 @@ end
 local function snapshot(ctx)
     if not recovery_enabled(ctx) or state.theme~=THEME.CITY_OF_GOLD then return end
     local recovered={}
-    for index,player in ipairs(players or {}) do
-        local item=player:get_held_entity()
-        if item and item.type then table.insert(recovered,{type=item.type.id,kind="held",player=index}) end
-        for _,entry in ipairs(BACK) do
-            local t=placements.type_of(entry)
-            if t and entity_has_item_type(player.uid,t) then table.insert(recovered,{type=t,kind="back",player=index}); break end
-        end
-    end
     local altar_type=placements.type_of("FLOOR_ALTAR"); local seen={}
     for _,altar_uid in ipairs(altar_type and get_entities_by_type(altar_type) or {}) do
         local altar=get_entity(altar_uid)
@@ -109,18 +101,29 @@ local function snapshot(ctx)
             -- items that were only briefly in the altar area.
             if not seen[uid] and item and item.type and allowed(ctx,item.type.id) and item.layer==altar.layer and not held(uid)
                 and math.abs(item.x-altar.x)<=4.5 and math.abs(item.y-(altar.y+1))<=0.75 then
-                seen[uid]=true; table.insert(recovered,{type=item.type.id,kind="near Kali altar",player=0})
+                seen[uid]=true; table.insert(recovered,{type=item.type.id,kind="near Kali altar",player=0,uid=uid})
             end
         end end
     end
-    local labels={}; for _,item in ipairs(recovered) do table.insert(labels,string.format("P%d %s=%s (type %s)",item.player,item.kind,name_of(item.type),tostring(item.type))) end
-    local signature=table.concat(labels,"; ")
-    if signature~="" and signature~=ctx.duat_recovery_signature then
-        ctx.duat_recovery=recovered; ctx.duat_recovery_signature=signature; ctx.duat_recovery_empty_logged=false
-        ctx.log("Duat recovery snapshot detected in City of Gold: "..signature)
-    elseif signature=="" and not ctx.duat_recovery_empty_logged then
+    ctx.duat_recovery=ctx.duat_recovery or {}
+    ctx.duat_recovery_seen=ctx.duat_recovery_seen or {}
+    local captured={}
+    for _,item in ipairs(recovered) do
+        -- A confirmed altar item can fall or be consumed before the next frame.
+        -- Retain it by UID rather than replacing the recovery set with each
+        -- transient scan result. Held items are excluded above.
+        if not ctx.duat_recovery_seen[item.uid] then
+            ctx.duat_recovery_seen[item.uid]=true
+            table.insert(ctx.duat_recovery,item)
+            table.insert(captured,string.format("%s (type %s)",name_of(item.type),tostring(item.type)))
+        end
+    end
+    if #captured>0 then
+        ctx.duat_recovery_empty_logged=false
+        ctx.log("Duat recovery captured above Kali altar: "..table.concat(captured,"; "))
+    elseif #recovered==0 and not ctx.duat_recovery_empty_logged then
         ctx.duat_recovery_empty_logged=true
-        ctx.log(ctx.duat_recovery and #ctx.duat_recovery>0 and "Duat recovery snapshot in City of Gold: no item currently detected; retaining the last non-empty snapshot for the transition" or "Duat recovery snapshot in City of Gold: no held or supported back item detected")
+        ctx.log(#ctx.duat_recovery>0 and "Duat recovery scan found no new altar items; retaining captured items for the transition" or "Duat recovery scan found no eligible unheld item above Kali altar")
     end
 end
 
@@ -137,6 +140,7 @@ local function restore_items(ctx)
         ctx.log(string.format("Duat recovery restored P%d %s %s (type %s) at Duat altar (uid %s)",item.player or 0,item.kind,name_of(item.type),tostring(item.type),tostring(uid)))
     end
     ctx.duat_recovery=nil
+    ctx.duat_recovery_seen={}
 end
 
 function M.register(ctx)
@@ -145,6 +149,6 @@ function M.register(ctx)
 end
 function M.on_post_level_generation(ctx)
     if state.theme==THEME.DUAT then restore_items(ctx)
-    elseif state.theme~=THEME.CITY_OF_GOLD then ctx.duat_recovery=nil end
+    elseif state.theme~=THEME.CITY_OF_GOLD then ctx.duat_recovery=nil; ctx.duat_recovery_seen={} end
 end
 return M
