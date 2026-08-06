@@ -105,26 +105,13 @@ local function snapshot(ctx)
             end
         end end
     end
-    ctx.duat_recovery=ctx.duat_recovery or {}
-    ctx.duat_recovery_seen=ctx.duat_recovery_seen or {}
-    local captured={}
+    ctx.duat_recovery=recovered
+    ctx.duat_recovery_empty_logged=#recovered==0
+    local labels={}
     for _,item in ipairs(recovered) do
-        -- A confirmed altar item can fall or be consumed before the next frame.
-        -- Retain it by UID rather than replacing the recovery set with each
-        -- transient scan result. Held items are excluded above.
-        if not ctx.duat_recovery_seen[item.uid] then
-            ctx.duat_recovery_seen[item.uid]=true
-            table.insert(ctx.duat_recovery,item)
-            table.insert(captured,string.format("%s (type %s)",name_of(item.type),tostring(item.type)))
-        end
+        table.insert(labels,string.format("%s (type %s, uid %s)",name_of(item.type),tostring(item.type),tostring(item.uid)))
     end
-    if #captured>0 then
-        ctx.duat_recovery_empty_logged=false
-        ctx.log("Duat recovery captured above Kali altar: "..table.concat(captured,"; "))
-    elseif #recovered==0 and not ctx.duat_recovery_empty_logged then
-        ctx.duat_recovery_empty_logged=true
-        ctx.log(#ctx.duat_recovery>0 and "Duat recovery scan found no new altar items; retaining captured items for the transition" or "Duat recovery scan found no eligible unheld item above Kali altar")
-    end
+    ctx.log(#labels>0 and "Duat recovery transition snapshot above Kali altar: "..table.concat(labels,"; ") or "Duat recovery transition snapshot found no eligible unheld item above Kali altar")
 end
 
 local function restore_items(ctx)
@@ -140,15 +127,16 @@ local function restore_items(ctx)
         ctx.log(string.format("Duat recovery restored P%d %s %s (type %s) at Duat altar (uid %s)",item.player or 0,item.kind,name_of(item.type),tostring(item.type),tostring(uid)))
     end
     ctx.duat_recovery=nil
-    ctx.duat_recovery_seen={}
 end
 
 function M.register(ctx)
     register_favor_rewards(ctx)
-    set_callback(function() snapshot(ctx) end,ON.FRAME)
+    set_callback(function()
+        if state.theme==THEME.CITY_OF_GOLD and state.theme_next==THEME.DUAT then snapshot(ctx) end
+    end,ON.TRANSITION)
 end
 function M.on_post_level_generation(ctx)
     if state.theme==THEME.DUAT then restore_items(ctx)
-    elseif state.theme~=THEME.CITY_OF_GOLD then ctx.duat_recovery=nil; ctx.duat_recovery_seen={} end
+    elseif state.theme~=THEME.CITY_OF_GOLD then ctx.duat_recovery=nil end
 end
 return M
