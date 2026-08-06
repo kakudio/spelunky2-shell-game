@@ -4,9 +4,9 @@ A Spelunky 2 randomizer mod that shuffles key progression items to create unique
 
 ## Current implementation
 
-The randomizer creates a deterministic, persisted `CHECK_ID -> REWARD_ID`
-mapping rather than taking items from a pool in entity-spawn order. Its
-randomizer seed is independent from the game's level seed.
+The randomizer creates a deterministic `CHECK_ID -> REWARD_ID` mapping rather
+than taking items from a pool in entity-spawn order. Its selected randomizer
+seed persists between launches; all run progress remains runtime-only.
 
 Runtime code is split by responsibility: `main.lua` manages lifecycle and
 console commands, `placements.lua` materializes mapped rewards, and `checks.lua`
@@ -84,6 +84,17 @@ Access options via Modlunky 2's options menu or Overlunky (F8) → Options:
 | **Randomizer Seed** | Choose a fixed seed; `0` generates a new layout at run start |
 | **Test Resources** | Grants a debug loadout for adapter verification |
 | **Duat Item Recovery** | Restores held and back items at Duat's Kali altar |
+| **Write Run Reports** | Writes seeds, spoiler mapping, and all mod logs for each run |
+
+## Reporting an Issue
+
+Leave **Write Run Reports** enabled. At the start of every run, the mod writes
+a report to `Mods/Data/KeyItemRandomizer/run_reports/`. Attach the newest `.txt`
+file when reporting a problem; it includes the randomizer seed, the game
+adventure seed, the full spoiler mapping, and all Key Item Randomizer logs.
+Use `kir_report_path()` in the Overlunky console to print the current report's
+location. The mod retains the newest 30 reports and deletes older reports
+automatically.
 
 ## Gameplay Tips
 
@@ -104,7 +115,7 @@ Access options via Modlunky 2's options menu or Overlunky (F8) → Options:
 
 ### API Usage
 - Uses Overlunky/Playlunky Lua API (Lua 5.4 with Sol2)
-- Callbacks: `ON.PRE_ENTITY_SPAWN`, `ON.POST_ENTITY_SPAWN`, `ON.SAVE`, `ON.LOAD`
+- Callbacks: `ON.PRE_ENTITY_SPAWN`, `ON.POST_ENTITY_SPAWN`
 - Entity manipulation: `get_entities_by`, `spawn_entity`, `kill_entity`
 - PRNG: Game's seeded random for deterministic results
 
@@ -146,8 +157,6 @@ The tag must exactly match the `version` in `mod.json` (for example, `0.1.0` req
 
 - Multiplayer event attribution is not yet verified; Kali's first-gift adapter
   currently uses the first active player.
-- Save/reload behavior for uncollected materialized rewards still requires an
-  in-game verification pass.
 
 ## Credits
 

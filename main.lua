@@ -1,9 +1,10 @@
--- Key Item Randomizer entry point: options, persistent mapping, save/load, UI commands.
+-- Key Item Randomizer entry point: options, seed persistence, runtime lifecycle, UI commands.
 local logic=require "logic"
 local checks=require "checks"
 local placements=require "placements"
 local tests=require "tests"
 local runtime=require "runtime_state"
+local logger=require "logger"
 
 -- Option registration takes both a short label and a long description. Keep
 -- the default as the final argument; otherwise Playlunky treats it as the
@@ -12,11 +13,13 @@ register_option_bool("enabled","Enable Key Item Randomizer","Enable or disable a
 register_option_int("seed","Randomizer Seed (0 = generate new layout)","Choose a fixed layout seed. Set 0 to generate a new layout when the run starts.",0,0,999999)
 register_option_bool("test_resources","Test: Start with resources and progression items","Give each player the test loadout used for check verification.",true)
 register_option_bool("duat_item_recovery","Duat Item Recovery","Restore held, equipped, and altar-dropped player items consumed by the City of Gold to Duat transition at the special Duat altar.",true)
-local options=options or {enabled=true,seed=0,test_resources=true,duat_item_recovery=true}
+register_option_bool("run_reports","Write Run Reports","Write a per-run issue report with seeds, spoiler, and mod logs to Mods/Data/KeyItemRandomizer/run_reports.",true)
+local options=options or {enabled=true,seed=0,test_resources=true,duat_item_recovery=true,run_reports=true}
+if options.run_reports==nil then options.run_reports=true end
 
-local randomizer_state={seed=0,mapping=nil,initialized=false,level_materialized={},saved_mapping_version=0}
+local randomizer_state={seed=0,mapping=nil,initialized=false,level_materialized={}}
 local runtime_context=nil
-local function log(message) print("[KeyItemRandomizer] "..message) end
+local log=logger.log
 local function grant_test_item(player,entity_type,label)
     if not entity_type or entity_has_item_type(player.uid,entity_type) then return false end
     local uid=spawn_entity_nonreplaceable(entity_type,player.x,player.y,player.layer,0,0)
@@ -37,20 +40,21 @@ local function grant_test_scepter(player)
     if uid then log("Granted test Scepter at player uid "..player.uid.."'s position") end
     return uid~=nil
 end
+local function grant_test_floor_item(player,entity_type,label)
+    if not entity_type then return false end
+    for _,uid in ipairs(get_entities_by_type(entity_type) or {}) do
+        local item=get_entity(uid)
+        if item and item.layer==player.layer and math.abs(item.x-player.x)+math.abs(item.y-player.y)<=3 then return false end
+    end
+    local uid=spawn_entity_snapped_to_floor(entity_type,player.x,player.y,player.layer)
+    if uid then log("Granted test "..label.." at player uid "..player.uid.."'s position") end
+    return uid~=nil
+end
 local function grant_test_tusk_idol(player)
-    local idol_type=placements.type_of("ITEM_MADAMETUSK_IDOL")
-    if not idol_type then return false end
     -- An Idol is a held item, so place it at the player's feet instead of
     -- displacing the test Excalibur. Limit the duplicate check to the start
     -- position, as other Idols in a level are unrelated.
-    for _,uid in ipairs(get_entities_by_type(idol_type) or {}) do
-        local idol=get_entity(uid)
-        if idol and idol.layer==player.layer and math.abs(idol.x-player.x)+math.abs(idol.y-player.y)<=3 then return false end
-    end
-    local uid=spawn_entity_snapped_to_floor(idol_type,player.x,player.y,player.layer)
-    if not uid then return false end
-    log("Granted test Tusk Idol at player uid "..player.uid.."'s position")
-    return true
+    return grant_test_floor_item(player,placements.type_of("ITEM_MADAMETUSK_IDOL"),"Tusk Idol")
 end
 local function now_seed() local value=math.floor(os.time()*1000)%999999; return value==0 and 1 or value end
 local function load_persisted_seed()
@@ -78,7 +82,6 @@ local function initialize()
     persist_seed(randomizer_state.seed)
     randomizer_state.mapping=logic.generate(randomizer_state.seed)
     randomizer_state.initialized=true
-    randomizer_state.saved_mapping_version=logic.LOGIC_VERSION
     log(string.format("Initialized logic v%d, randomizer seed %d (%d checks / %d rewards)",logic.LOGIC_VERSION,randomizer_state.seed,logic.check_count(),logic.reward_count()))
 end
 runtime_context=runtime.new(randomizer_state,initialize,log,function() return options.duat_item_recovery end)
@@ -106,25 +109,6 @@ local function on_post_level_generation()
 end
 checks.register_spawn_hooks(runtime_context)
 set_callback(on_post_level_generation,ON.POST_LEVEL_GENERATION)
-set_callback(function(ctx)
-    if options.enabled and randomizer_state.initialized then
-        local data=runtime.save_data(runtime_context)
-        data.logic_version=logic.LOGIC_VERSION; data.seed=randomizer_state.seed; data.mapping=randomizer_state.mapping
-        ctx:save(json.encode(data))
-    end
-end,ON.SAVE)
-set_callback(function(ctx)
-    if not options.enabled then return end
-    local raw=ctx:load()
-    if raw and raw~="" then
-        local data=json.decode(raw)
-        if data and data.logic_version==logic.LOGIC_VERSION and data.mapping then
-            randomizer_state.seed=data.seed; randomizer_state.mapping=data.mapping; randomizer_state.initialized=true; randomizer_state.saved_mapping_version=data.logic_version
-            runtime.restore_data(runtime_context,data)
-            log("Restored randomizer seed "..randomizer_state.seed.." and its saved mapping")
-        end
-    end
-end,ON.LOAD)
 set_callback(function() if options.enabled and not randomizer_state.initialized then initialize() end end,ON.START)
 set_callback(function()
     if not options.enabled then return end
@@ -132,6 +116,9 @@ set_callback(function()
     -- run only. ON.START is also used by shortcuts/debug starts, which may
     -- not begin in 1-1, so reset unconditionally here.
     runtime.reset_run(runtime_context)
+    local report_path=logger.begin_run(randomizer_state,logic,options.run_reports)
+    if report_path then log("Run report started: Mods/Data/KeyItemRandomizer/"..report_path)
+    elseif options.run_reports then log("WARNING: could not create this run's report file") end
     log("Reset Crown/Hedjet progression for new run")
     if options.test_resources then
         for _,player in ipairs(players) do
@@ -146,6 +133,7 @@ set_callback(function()
             grant_test_item(player,ENT_TYPE.ITEM_PICKUP_CROWN,"Crown")
             grant_test_item(player,ENT_TYPE.ITEM_PICKUP_SKELETON_KEY,"Skeleton Key")
             grant_test_item(player,ENT_TYPE.ITEM_PICKUP_SPECIALCOMPASS,"Alien Compass")
+            grant_test_floor_item(player,ENT_TYPE.ITEM_PICKUP_TABLETOFDESTINY,"Tablet of Destiny")
             grant_test_item(player,ENT_TYPE.ITEM_PICKUP_SPIKESHOES,"Spike Shoes")
             local excalibur_type=placements.type_of("ITEM_EXCALIBUR")
             local vlads_cape_type=placements.type_of("ITEM_VLADS_CAPE")
@@ -155,7 +143,7 @@ set_callback(function()
             grant_test_tusk_idol(player)
             runtime_context.progression.crown=true
         end
-        log("Test resources granted: $1,000,000, 50 health/bombs/ropes, Udjat Eye, Ankh, Crown, Skeleton Key, Alien Compass, Spike Shoes, Excalibur, Vlad's Cape, and a Scepter and Tusk Idol at each player's position")
+        log("Test resources granted: $1,000,000, 50 health/bombs/ropes, Udjat Eye, Ankh, Crown, Skeleton Key, Alien Compass, Tablet of Destiny, Spike Shoes, Excalibur, Vlad's Cape, and a Scepter and Tusk Idol at each player's position")
     end
     checks.replace_excalibur_if_gated(runtime_context)
 end,ON.START)
@@ -219,6 +207,11 @@ register_console_command("kir_status",function()
     print(string.format("[KIR] Sparrow quest state=%s; last observed transition=%s",tostring(sparrow_state),runtime_context.sparrow_last_transition and (tostring(runtime_context.sparrow_last_transition.from).." -> "..tostring(runtime_context.sparrow_last_transition.to)) or "none"))
     for check,detail in pairs(failures) do print("[KIR] FAILED "..check..": "..detail) end
     return true
+end)
+register_console_command("kir_report_path",function()
+    local path=logger.report_path()
+    print(path and "[KIR] Current run report: Mods/Data/KeyItemRandomizer/"..path or "[KIR] No active run report (start a run or enable Write Run Reports).")
+    return path or false
 end)
 register_console_command("kir_where",function()
     local player=players and players[1]

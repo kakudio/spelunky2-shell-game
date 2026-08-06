@@ -7,6 +7,7 @@ local LEVEL_TABLES={
     "quillback_hooks", "beg_hooks", "anubis_hooks",
     "humphead_hooks", "yeti_hooks", "lahamu_hooks", "vlad_hooks", "tiamat_hooks", "eggplant_king_hooks",
     "moon_bows", "moon_hidden_bows",
+    "sun_challenge_bags",
 }
 
 function M.new(randomizer_state, initialize, log, is_duat_recovery_enabled)
@@ -14,12 +15,12 @@ function M.new(randomizer_state, initialize, log, is_duat_recovery_enabled)
         randomizer_state=randomizer_state,
         quillback_hooks={}, beg_hooks={}, anubis_hooks={},
         humphead_hooks={}, yeti_hooks={}, lahamu_hooks={}, vlad_hooks={}, tiamat_hooks={}, eggplant_king_hooks={},
-        pending_yeti_drops={}, spawn_replacements={}, moon_bows={}, moon_hidden_bows={},
+        pending_yeti_drops={}, spawn_replacements={}, moon_bows={}, moon_hidden_bows={}, sun_challenge_bags={},
         lahamu_diagnostic_logged=false,
         moon_handoff_spawning=false, kali_last_gifts=nil, kali_known_items={},
         kali_presents={}, kali_present_source_placed=false, kali_present_completed=false,
         kali_present_sacrifice_pending=false, kali_present_source_uid=nil, kali_present_source_seen=false, kali_present_source_location=nil,
-        duat_recovery=nil, duat_recovery_spawned=false, duat_kali_check=nil,
+        duat_recovery=nil, duat_recovery_spawned=false,
         beg_true_crown_healed=false,
         duat_recovery_signature=nil, duat_recovery_empty_logged=false,
         sparrow_last_state=nil, sparrow_last_transition=nil,
@@ -70,39 +71,11 @@ function M.reset_run(ctx)
     ctx.pending_kali_present_payload=nil
     ctx.duat_recovery=nil
     ctx.duat_recovery_spawned=false
-    ctx.duat_kali_check=nil
     ctx.beg_true_crown_healed=false
     ctx.duat_recovery_signature=nil
     ctx.duat_recovery_empty_logged=false
     ctx.sparrow_last_state=nil
     ctx.sparrow_last_transition=nil
-end
-
-function M.save_data(ctx)
-    return {
-        progression={crown=ctx.progression.crown,hedjet=ctx.progression.hedjet},
-        kali_present_source_placed=ctx.kali_present_source_placed,
-        kali_present_source_uid=ctx.kali_present_source_uid,
-        kali_present_completed=ctx.kali_present_completed,
-        kali_present_source_location=ctx.kali_present_source_location,
-        duat_recovery=ctx.duat_recovery,
-        duat_kali_check=ctx.duat_kali_check,
-        sparrow_last_state=ctx.sparrow_last_state,
-        sparrow_last_transition=ctx.sparrow_last_transition,
-    }
-end
-
-function M.restore_data(ctx, data)
-    ctx.progression.crown=data.progression and data.progression.crown or false
-    ctx.progression.hedjet=data.progression and data.progression.hedjet or false
-    ctx.kali_present_source_placed=data.kali_present_source_placed or false
-    ctx.kali_present_source_uid=data.kali_present_source_uid
-    ctx.kali_present_completed=data.kali_present_completed or false
-    ctx.kali_present_source_location=data.kali_present_source_location
-    ctx.duat_recovery=data.duat_recovery
-    ctx.duat_kali_check=data.duat_kali_check
-    ctx.sparrow_last_state=data.sparrow_last_state
-    ctx.sparrow_last_transition=data.sparrow_last_transition
 end
 
 return M

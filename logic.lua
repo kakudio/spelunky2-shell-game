@@ -3,7 +3,7 @@
 -- validator can be exercised from the in-game console and reviewed in isolation.
 
 local M = {}
-M.LOGIC_VERSION = 24
+M.LOGIC_VERSION = 25
 
 M.LOCATIONS = {
     LOCATION_DWELLING = { parents = {} },
@@ -32,6 +32,9 @@ M.CHECKS = {
     { id="CHECK_YANG", location="LOCATION_DWELLING", layer="BACKGROUND", base_reward="NONE" },
     { id="CHECK_QUILLBACK", location="LOCATION_DWELLING", layer="FOREGROUND", base_reward="REWARD_BOMB_BAG" },
     { id="CHECK_BLACK_MARKET", location="LOCATION_JUNGLE", layer="BACKGROUND", all_of={"REWARD_UDJAT_EYE"}, base_reward="REWARD_HEDJET" },
+    -- Queen Bee is optional and can be bypassed, so it can never receive a
+    -- progression-key reward.
+    { id="CHECK_QUEEN_BEE", location="LOCATION_JUNGLE", layer="FOREGROUND", base_reward="REWARD_ROYAL_JELLY", non_key=true },
     { id="CHECK_SISTERS_OLMEC_REWARD", locations={"LOCATION_JUNGLE", "LOCATION_OLMEC"}, layer="FOREGROUND", base_reward="REWARD_BOMB_BOX" },
     { id="CHECK_VAN_HORSING_RESCUE", location="LOCATION_VOLCANA", layer="BACKGROUND", base_reward="REWARD_DIAMOND" },
     { id="CHECK_VLADS_CASTLE", location="LOCATION_VOLCANA", layer="BACKGROUND", all_of={"REWARD_UDJAT_EYE"}, base_reward="REWARD_CROWN" },
@@ -58,6 +61,9 @@ M.CHECKS = {
     { id="CHECK_SPARROW_VAULT", location="LOCATION_NEO_BABYLON", layer="BACKGROUND", base_reward="REWARD_PLAYER_BAG_ROPES" },
     { id="CHECK_TIAMAT", location="LOCATION_TIAMAT", layer="FOREGROUND", base_reward="NONE" },
     { id="CHECK_SUN_CHALLENGE", location="LOCATION_SUNKEN_CITY", layer="BACKGROUND", base_reward="REWARD_ARROW_OF_LIGHT" },
+    -- Completing the Sun Challenge also awards a Player Bag containing ropes
+    -- and bombs. It is a distinct native reward and therefore its own check.
+    { id="CHECK_SUN_CHALLENGE_SUPPLIES", location="LOCATION_SUNKEN_CITY", layer="BACKGROUND", base_reward="REWARD_PLAYER_BAG_ROPES_BOMBS" },
     { id="CHECK_EGGPLANT_KING", location="LOCATION_EGGPLANT_WORLD", layer="FOREGROUND", all_of={"REWARD_EGGPLANT"}, base_reward="REWARD_EGGPLANT_CROWN" },
     { id="CHECK_SPARROW", location="LOCATION_NONE", layer="NONE", base_reward="REWARD_ROPE_PILE" },
     -- Humphead's present/reward is the eggplant-chain check. The game labels
@@ -76,16 +82,21 @@ M.CHECKS = {
 -- Exactly one pool reward per check. Diamond is a vanilla reward, but is not in
 -- the shuffle pool; Skeleton Key is included because it is an explicit gate.
 M.REWARDS = {
- "REWARD_UDJAT_EYE","REWARD_BOMB_BAG","REWARD_HEDJET","REWARD_BOMB_BOX","REWARD_CROWN","REWARD_VLADS_CAPE","REWARD_HOU_YIS_BOW","REWARD_ANKH","REWARD_EXCALIBUR","REWARD_SKELETON_KEY","REWARD_TUSK_IDOL","REWARD_TABLET_OF_DESTINY","REWARD_SCEPTER","REWARD_ALIEN_COMPASS","REWARD_JETPACK","REWARD_CLONE_GUN","REWARD_ELIXIR","REWARD_SPIKE_SHOES","REWARD_COMPASS","REWARD_PLASMA_CANNON","REWARD_ROYAL_JELLY","REWARD_PLAYER_BAG_ROPES","REWARD_ARROW_OF_LIGHT","REWARD_EGGPLANT_CROWN","REWARD_ROPE_PILE","REWARD_EGGPLANT","REWARD_KAPALA","REWARD_TRUE_CROWN","REWARD_TELEPACK","REWARD_MATTOCK",
+ "REWARD_UDJAT_EYE","REWARD_HEDJET","REWARD_BOMB_BOX","REWARD_CROWN","REWARD_VLADS_CAPE","REWARD_HOU_YIS_BOW","REWARD_ANKH","REWARD_EXCALIBUR","REWARD_SKELETON_KEY","REWARD_TUSK_IDOL","REWARD_TABLET_OF_DESTINY","REWARD_SCEPTER","REWARD_ALIEN_COMPASS","REWARD_JETPACK","REWARD_CLONE_GUN","REWARD_ELIXIR","REWARD_SPIKE_SHOES","REWARD_COMPASS","REWARD_PLASMA_CANNON","REWARD_ROYAL_JELLY","REWARD_PLAYER_BAG_ROPES","REWARD_PLAYER_BAG_ROPES_BOMBS","REWARD_ARROW_OF_LIGHT","REWARD_EGGPLANT_CROWN","REWARD_EGGPLANT","REWARD_KAPALA","REWARD_TRUE_CROWN","REWARD_TELEPACK","REWARD_MATTOCK",
  "REWARD_CLIMBING_GLOVES","REWARD_SPRING_SHOES","REWARD_TELEPORTER","REWARD_POWERPACK","REWARD_HOVERPACK","REWARD_FREEZE_RAY","REWARD_SHOTGUN","REWARD_SPECTACLES","REWARD_CAPE",
 }
+
+-- Used only after every unique pool reward has been assigned. These common
+-- consumables are repeated in a balanced rotation and never displace a
+-- unique reward in the main pool.
+M.OVERFLOW_REWARDS={"REWARD_BOMB_BAG","REWARD_ROPE_PILE","REWARD_TURKEY_LEG"}
 
 -- A check's group is the latest progression window in which it is normally
 -- available.  Branch-exclusive checks remain in the pool: validation tests
 -- every route independently rather than discarding the other branch.
 M.CHECK_GROUPS = {
     CHECK_UDJAT_CHEST=1, CHECK_YANG=1, CHECK_QUILLBACK=1,
-    CHECK_BLACK_MARKET=2, CHECK_SISTERS_OLMEC_REWARD=2,
+    CHECK_BLACK_MARKET=2, CHECK_QUEEN_BEE=2, CHECK_SISTERS_OLMEC_REWARD=2,
     CHECK_VAN_HORSING_RESCUE=2, CHECK_VLADS_CASTLE=2, CHECK_VLAD=2,
     CHECK_MOON_CHALLENGE_JUNGLE=2, CHECK_MOON_CHALLENGE_VOLCANA=2,
     CHECK_OLMEC_ANKH=2, CHECK_KALI_ALTAR_1=3,
@@ -99,7 +110,7 @@ M.CHECK_GROUPS = {
     CHECK_LAHAMU=5, CHECK_MOTHERSHIP_PLASMA_CANNON=5,
     CHECK_TUSK_PALACE_VISIT=6, CHECK_SPARROW_VAULT=6,
     CHECK_KALI_ALTAR_2=6, CHECK_BEG_TRUE_CROWN=6,
-    CHECK_TIAMAT=7, CHECK_SUN_CHALLENGE=7, CHECK_EGGPLANT_KING=7,
+    CHECK_TIAMAT=7, CHECK_SUN_CHALLENGE=7, CHECK_SUN_CHALLENGE_SUPPLIES=7, CHECK_EGGPLANT_KING=7,
 }
 
 -- Exactly one of these is selected per seed as the guaranteed early mobility
@@ -111,6 +122,26 @@ M.STARS_MOBILITY_REWARDS={"REWARD_CAPE","REWARD_VLADS_CAPE","REWARD_JETPACK"}
 -- encounter window (groups 1-2) but before the group-7 endgame checks.
 M.REWARD_PLACEMENT_WINDOWS={
     REWARD_TUSK_IDOL={minimum_group=3, maximum_group=6},
+}
+
+-- A branch-only key may not be placed behind the opposite branch.  Excalibur
+-- opens Abzu/Kingu on the Tide Pool route, while the Scepter opens City of
+-- Gold/Duat on the Temple route.  Group timing alone cannot express this,
+-- since checks in both routes share group 3.
+M.REWARD_EXCLUDED_LOCATIONS={
+    REWARD_EXCALIBUR={LOCATION_TEMPLE=true},
+    REWARD_SCEPTER={LOCATION_TIDE_POOL=true},
+}
+
+-- The Tusk Idol advances Sparrow's quest when it is carried through an exit.
+-- Kali-related rewards can be delayed, relocated to Duat, or consumed by an
+-- altar interaction, so the Idol must never be assigned to one of them.
+M.REWARD_EXCLUDED_CHECKS={
+    REWARD_TUSK_IDOL={
+        CHECK_KALI_PRESENT=true,
+        CHECK_KALI_ALTAR_1=true,
+        CHECK_KALI_ALTAR_2=true,
+    },
 }
 
 local function is_stars_mobility_reward(value)
@@ -298,8 +329,17 @@ local function reward_is_requirement(check, reward)
     return false
 end
 local function compatible_check(check, reward, deadline, seed, minimum_group)
+    if check.non_key and M.KEY_REWARD_DEADLINES[reward] then return false end
+    if M.REWARD_EXCLUDED_CHECKS[reward] and M.REWARD_EXCLUDED_CHECKS[reward][check.id] then return false end
     local group=M.check_group(check.id,seed) or math.huge
     if group>deadline or group<(minimum_group or 1) then return false end
+    local excluded=M.REWARD_EXCLUDED_LOCATIONS[reward]
+    if excluded then
+        if check.location and excluded[check.location] then return false end
+        for _,location_id in ipairs(check.locations or {}) do
+            if excluded[location_id] then return false end
+        end
+    end
     return not reward_is_requirement(check,reward)
 end
 
@@ -333,7 +373,11 @@ function M.generate(seed)
             local remaining_checks, fill_rewards={},{}
             for _, check in ipairs(shuffled(M.CHECKS,next_int)) do if check.shuffle~=false and not used_check[check.id] then table.insert(remaining_checks,check.id) end end
             for _, reward in ipairs(shuffled(M.REWARDS,next_int)) do if not used_reward[reward] then table.insert(fill_rewards,reward) end end
-            for i,check_id in ipairs(remaining_checks) do map[check_id]=fill_rewards[i] end
+            local overflow=shuffled(M.OVERFLOW_REWARDS,next_int)
+            for i,check_id in ipairs(remaining_checks) do
+                -- Each pass uses each option once, keeping counts within one.
+                map[check_id]=fill_rewards[i] or overflow[((i-#fill_rewards-1)%#overflow)+1]
+            end
             local ok, result=M.validate(map)
             if ok then return map, result end
         end
@@ -348,10 +392,12 @@ function M.self_test(count, first_seed)
     for seed=first_seed, first_seed+count-1 do
         local first, route=M.generate(seed)
         local second=M.generate(seed)
-        local seen, entries={},0
+        local seen, overflow_counts, entries={}, {}, 0
         for check_id, reward in pairs(first) do
             entries=entries+1
-            if seen[reward] then return false, "duplicate reward "..reward.." at seed "..seed end
+            local is_overflow=false
+            for _,overflow_reward in ipairs(M.OVERFLOW_REWARDS) do if reward==overflow_reward then is_overflow=true; overflow_counts[reward]=(overflow_counts[reward] or 0)+1; break end end
+            if seen[reward] and not is_overflow then return false, "duplicate reward "..reward.." at seed "..seed end
             seen[reward]=true
             if second[check_id] ~= reward then return false, "nondeterministic mapping at seed "..seed end
         end
@@ -359,6 +405,9 @@ function M.self_test(count, first_seed)
         for _,check in ipairs(M.CHECKS) do if check.shuffle~=false then shuffled_check_count=shuffled_check_count+1 end end
         if entries ~= shuffled_check_count then return false, "wrong shuffled check count at seed "..seed end
         for reward in pairs(M.KEY_REWARD_DEADLINES) do if not seen[reward] then return false, "missing key reward "..reward.." at seed "..seed end end
+        local least,most=math.huge,0
+        for _,reward in ipairs(M.OVERFLOW_REWARDS) do local count=overflow_counts[reward] or 0; least=math.min(least,count); most=math.max(most,count) end
+        if most-least>1 then return false, "unbalanced overflow rewards at seed "..seed end
         if not route.victory then return false, "no Cosmic Ocean route at seed "..seed end
     end
     return true, string.format("passed %d seeds starting at %d", count, first_seed)

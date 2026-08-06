@@ -12,11 +12,12 @@ local REWARD_ENTITY_NAMES = {
     REWARD_TUSK_IDOL="ITEM_MADAMETUSK_IDOL", REWARD_TABLET_OF_DESTINY="ITEM_PICKUP_TABLETOFDESTINY",
     REWARD_SCEPTER="ITEM_SCEPTER", REWARD_ALIEN_COMPASS="ITEM_PICKUP_SPECIALCOMPASS",
     REWARD_JETPACK="ITEM_JETPACK", REWARD_CLONE_GUN="ITEM_CLONEGUN",
-    REWARD_ELIXIR="ITEM_PICKUP_ELIXIR", REWARD_EGGPLANT_CHILD="CHAR_EGGPLANT_CHILD",
+    REWARD_ELIXIR="ITEM_PICKUP_ELIXIR",
     REWARD_SPIKE_SHOES="ITEM_PICKUP_SPIKESHOES", REWARD_COMPASS="ITEM_PICKUP_COMPASS",
     REWARD_PLASMA_CANNON="ITEM_PLASMACANNON", REWARD_ROYAL_JELLY="ITEM_PICKUP_ROYALJELLY",
-    REWARD_PLAYER_BAG_ROPES="ITEM_PICKUP_PLAYERBAG", REWARD_ARROW_OF_LIGHT="ITEM_LIGHT_ARROW",
+    REWARD_PLAYER_BAG_ROPES="ITEM_PICKUP_PLAYERBAG", REWARD_PLAYER_BAG_ROPES_BOMBS="ITEM_PICKUP_PLAYERBAG", REWARD_ARROW_OF_LIGHT="ITEM_LIGHT_ARROW",
     REWARD_EGGPLANT_CROWN="ITEM_PICKUP_EGGPLANTCROWN", REWARD_ROPE_PILE="ITEM_PICKUP_ROPEPILE",
+    REWARD_TURKEY_LEG="ITEM_PICKUP_COOKEDTURKEY",
     REWARD_EGGPLANT="ITEM_EGGPLANT", REWARD_KAPALA="ITEM_PICKUP_KAPALA",
     REWARD_TRUE_CROWN="ITEM_PICKUP_TRUECROWN",
     REWARD_TELEPACK="ITEM_TELEPORTER_BACKPACK", REWARD_MATTOCK="ITEM_MATTOCK",
@@ -33,6 +34,27 @@ function M.reward_type(randomizer_state, check_id)
     return reward, reward and M.type_of(REWARD_ENTITY_NAMES[reward]) or nil
 end
 
+function M.spawn(ent_type,x,y,layer,snap_to_floor)
+    if snap_to_floor then return spawn_entity_snapped_to_floor(ent_type,x,y,layer) end
+    return spawn_entity(ent_type,x,y,layer,0,0)
+end
+
+local PLAYER_BAG_CONTENTS={
+    REWARD_PLAYER_BAG_ROPES={bombs=0,ropes=12},
+    REWARD_PLAYER_BAG_ROPES_BOMBS={bombs=12,ropes=12},
+}
+
+function M.configure_reward(uid,reward)
+    local contents=PLAYER_BAG_CONTENTS[reward]
+    if not contents or not uid or uid<0 then return end
+    local entity=get_entity(uid)
+    local bag=entity and entity:as_playerbag() or nil
+    if bag then
+        bag.bombs=contents.bombs
+        bag.ropes=contents.ropes
+    end
+end
+
 function M.materialize(randomizer_state, log, check_id, x, y, layer, source_uid, snap_to_floor)
     if randomizer_state.level_materialized[check_id] then return false end
     local reward, ent_type=M.reward_type(randomizer_state, check_id)
@@ -44,9 +66,8 @@ function M.materialize(randomizer_state, log, check_id, x, y, layer, source_uid,
         local source=get_entity(source_uid)
         if source then source:destroy() end
     end
-    local spawned_uid
-    if snap_to_floor then spawned_uid=spawn_entity_snapped_to_floor(ent_type, x, y, layer)
-    else spawned_uid=spawn_entity(ent_type, x, y, layer, 0, 0) end
+    local spawned_uid=M.spawn(ent_type,x,y,layer,snap_to_floor)
+    M.configure_reward(spawned_uid,reward)
     randomizer_state.level_materialized[check_id]=true
     log(string.format("CHECK %s -> %s at %.1f, %.1f layer %s", check_id, reward, x, y, tostring(layer)))
     return spawned_uid

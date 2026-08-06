@@ -68,8 +68,10 @@ function M.register(ctx)
         -- otherwise the game applies the bag's character texture to the reward.
         ctx.defer(1,"Sparrow vault Player Bag replacement",function()
             if ctx.randomizer_state.level_materialized.CHECK_SPARROW_VAULT then return end
-            local replacement_uid=materialize(ctx,"CHECK_SPARROW_VAULT",x,y,layer,uid,true)
-            ctx.log("Sparrow vault Player Bag replaced after native setup (uid "..tostring(replacement_uid)..")")
+            -- Keep the reward on the floor block directly left of Sparrow's
+            -- native bag position, rather than overlapping her tile.
+            local replacement_uid=materialize(ctx,"CHECK_SPARROW_VAULT",x-1,y,layer,uid,true)
+            ctx.log("Sparrow vault Player Bag replaced left of Sparrow after native setup (uid "..tostring(replacement_uid)..")")
             if replacement_uid then
                 ctx.defer(1,"Sparrow vault replacement visibility",function()
                     local replacement=get_entity(replacement_uid)

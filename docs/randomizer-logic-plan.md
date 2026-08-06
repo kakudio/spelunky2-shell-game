@@ -41,6 +41,11 @@ namespaces:
 The two route pairs are mutually exclusive: `LOCATION_JUNGLE` /
 `LOCATION_VOLCANA`, and `LOCATION_TIDE_POOL` / `LOCATION_TEMPLE`.
 
+Placement also respects branch-specific key exclusions: `REWARD_EXCALIBUR`
+cannot be assigned to a Temple check, and `REWARD_SCEPTER` cannot be assigned
+to a Tide Pool check. This prevents a branch key from being placed after the
+player has committed to the opposite route.
+
 | Location ID | Parent location ID(s) | Requirements |
 |---|---|---|
 | `LOCATION_DWELLING` | `NONE` | [] |
@@ -89,6 +94,7 @@ or `NONE` for an abstract/non-spatial check.
 | `CHECK_ALIEN_COMPASS` | `LOCATION_TEMPLE` | `BACKGROUND` | [`CHECK_VAN_HORSING_RESCUE`, `CHECK_VLAD`] | `REWARD_ALIEN_COMPASS` |
 | `CHECK_OSIRIS` | `LOCATION_DUAT` | `BACKGROUND` | [] | `REWARD_TABLET_OF_DESTINY` |
 | `CHECK_ANUBIS_II` | `LOCATION_DUAT` | `BACKGROUND` | [] | `REWARD_JETPACK` |
+| `CHECK_QUEEN_BEE` | `LOCATION_JUNGLE` | `FOREGROUND` | [] | `REWARD_ROYAL_JELLY` (non-key) |
 | `CHECK_STARS_CHALLENGE_TIDE_POOL` | `LOCATION_TIDE_POOL` | `BACKGROUND` | [] | `REWARD_CLONE_GUN` |
 | `CHECK_STARS_CHALLENGE_TEMPLE` | `LOCATION_TEMPLE` | `BACKGROUND` | [] | `REWARD_ELIXIR` |
 | `CHECK_YETI_QUEEN` | `LOCATION_ICE_CAVES` | `BACKGROUND` | [] | `REWARD_SPIKE_SHOES` |
@@ -99,6 +105,7 @@ or `NONE` for an abstract/non-spatial check.
 | `CHECK_SPARROW_VAULT` | `LOCATION_NEO_BABYLON` | `BACKGROUND` | [] | `REWARD_PLAYER_BAG_ROPES` |
 | `CHECK_TIAMAT` | `LOCATION_TIAMAT` | `FOREGROUND` | [] | `NONE` |
 | `CHECK_SUN_CHALLENGE` | `LOCATION_SUNKEN_CITY` | `BACKGROUND` | [] | `REWARD_ARROW_OF_LIGHT` |
+| `CHECK_SUN_CHALLENGE_SUPPLIES` | `LOCATION_SUNKEN_CITY` | `BACKGROUND` | [] | `REWARD_PLAYER_BAG_ROPES_BOMBS` |
 | `CHECK_EGGPLANT_KING` | `LOCATION_EGGPLANT_WORLD` | `FOREGROUND` | [] | `REWARD_EGGPLANT_CROWN` |
 | `CHECK_SPARROW` | `LOCATION_NONE` | `NONE` | [] | `REWARD_ROPE_PILE` |
 | `CHECK_HUMPHEAD` | `LOCATION_TIDE_POOL` | `FOREGROUND` | [] | `REWARD_EGGPLANT` |
@@ -128,9 +135,8 @@ anchor in the treasure room and associate it with the run's assigned
 and becomes normally obtainable when the player completes Yang's turkey event
 and receives the key.
 
-This is a check-specific spawn rule, not crate/chest-content randomization. It
-must be persisted with the check mapping so the item does not duplicate after
-a reload.
+This is a check-specific spawn rule, not crate/chest-content randomization.
+It is runtime-only and is intentionally reset after a normal relaunch.
 
 `CHECK_TUSK_DICE_HOUSE` uses the fifth and final Dice House prize as its
 scripted anchor. Replace that prize with the check's assigned item, but do not
@@ -181,21 +187,18 @@ a named check.
 new run
   -> choose/generate RandomizerSeed once
   -> build and validate the complete { check_id -> item_id } mapping once
-  -> save RandomizerSeed, mapping, and logic-version
   -> materialize that mapping whenever its check appears in a level
 ```
 
 - A nonzero `RandomizerSeed` always creates the same mapping for the same
   logic version and enabled item/location pools, regardless of game seed.
 - Seed `0` generates a new `RandomizerSeed` once when starting a *new run*,
-  displays it, and then persists it. It must not reroll on a level transition,
-  reload, or death.
-- Save the mapping itself, not only the seed, so an update to placement logic
-  cannot change an in-progress run.
+  displays it, and then persists it. It must not reroll on a level transition
+  or death. A normal relaunch rebuilds the mapping from that selected seed.
 - Generate the full mapping before entering Dwelling. Runtime code should look
   up `mapping[check_id]`; it must not consume a shuffled item pool according to
   entity spawn order.
-- A spoiler log and UI should display both `Game seed` and `Randomizer seed`.
+- Run reports and UI should display both `Game seed` and `Randomizer seed`.
 
 This replaces the current behavior of rebuilding/shuffling the item pool during
 level lifecycle callbacks. It also makes a shared randomizer seed suitable for

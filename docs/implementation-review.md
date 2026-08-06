@@ -8,8 +8,8 @@
   guaranteed early world checks (`Udjat Chest`, `Quillback`, `Olmec Ankh`), in
   a seeded order. This is conservative but proves every generated mapping has
   a physical progression route without relying on optional-room generation.
-- `main.lua` persists the full mapping and logic version, and uses the mapping
-  for every spawn. It does not remove a runtime item pool.
+- `main.lua` persists only the selected seed and rebuilds its deterministic
+  mapping on launch. Per-run state is never serialized.
 - Generic item and NPC adapters have been added for the reliable vanilla
   entities listed in `main.lua`.
 
@@ -28,7 +28,7 @@ reward before the intended completion condition.
 | `CHECK_TUSK_DICE_HOUSE` | The fifth dice prize must be replaced, not any arbitrary Tusk item. | Hook the fifth prize spawn only. Preserve the native automatic VIP invitation. |
 | `CHECK_TUSK_IDOL`, `CHECK_TUSK_PALACE_VISIT`, `CHECK_SPARROW_VAULT` | Each has a quest-state / room-specific anchor. | Add their exact room/event anchors after examining generated entities. |
 | `CHECK_ALIEN_COMPASS`, `CHECK_LAHAMU`, `CHECK_MOTHERSHIP_PLASMA_CANNON` | Mothership access is a quest state, not a standalone level location. | Hook Van/Vlad state and the two Mothership reward entities. |
-| `CHECK_EGGPLANT_MOAI`, `CHECK_EGGPLANT_KING` | Eggplant Child and King rewards need foreground-safe, room-specific handling. | Identify their exact reward events. |
+| `CHECK_EGGPLANT_KING` | Yama's Eggplant Crown reward needs foreground-safe, room-specific handling. | Identify and replace its exact death-reward event. Eggplant Child is intentionally excluded because spawning it crashes the game. |
 | Kali and Beg checks | They are player-action / dialogue-state checks rather than ordinary static items. | Use sacrifice and dialogue/death callbacks; do not materialize merely because the level loads. |
 | Boss checks | Current NPC adapter places a visible reward near Quillback, Kingu, and Tiamat at generation. | Prefer a verified death/reward callback so an uncleared boss cannot be bypassed. |
 
@@ -38,22 +38,14 @@ Run `kir_anchors` in the Overlunky console. It prints any reward entity-name
 constant unavailable in the installed API. Correct missing names in
 `REWARD_ENTITY_NAMES` before attempting that reward in a run.
 
-## Save/reload caveat to test
-
-The mapping is saved, which prevents rerolls. Actual uncollected spawned items
-are normally preserved by the game save. Confirm this with one test: leave a
-mapped item on the ground, save/quit, reload, and ensure exactly one copy
-remains. If the engine regenerates that room rather than restoring entities,
-add a persisted per-check spawned/collected state plus a room identity.
-
 ## Recommended acceptance test
 
 1. Run `kir_fuzz 1000 1`; it must report success.
 2. For seeds 1, 42, and 424242, run `kir_validate <seed>` and compare the
    output to `docs/victory-routes.md`.
 3. Use `kir_anchors`; resolve every reported missing constant.
-4. Start a run with a fixed randomizer seed, transition a level, die/restart,
-   then save/reload. `kir_status` must show the same seed and mapping.
+4. Start a run with a fixed randomizer seed, transition a level, and die/restart.
+   `kir_status` must show the same seed and mapping within that session.
 5. Playtest every row in the table above before enabling those checks in a
    release build. The present implementation has safe logic but intentionally
    does not fake completion of these event gates.

@@ -50,18 +50,35 @@ local function mapping_tests()
         if kali_group~=2 then
             return false,"Kali Present must remain in logic group 2 at seed "..seed
         end
-        local seen,count={},0
+        local seen,overflow_counts,count={}, {}, 0
         for check_id,reward in pairs(first) do
             count=count+1
             if second[check_id]~=reward then return false,"nondeterministic fixed seed "..seed end
-            if seen[reward] then return false,"duplicate reward "..reward.." at seed "..seed end
+            local is_overflow=false
+            for _,overflow_reward in ipairs(logic.OVERFLOW_REWARDS) do if reward==overflow_reward then is_overflow=true; overflow_counts[reward]=(overflow_counts[reward] or 0)+1; break end end
+            if seen[reward] and not is_overflow then return false,"duplicate reward "..reward.." at seed "..seed end
             seen[reward]=true
+            if check_id=="CHECK_QUEEN_BEE" and logic.KEY_REWARD_DEADLINES[reward] then return false,"Queen Bee received key reward "..reward.." at seed "..seed end
             if reward=="REWARD_TUSK_IDOL" then
                 local group=logic.check_group(check_id,seed)
                 if group<3 or group>6 then return false,"Tusk Idol placed outside groups 3-6 at seed "..seed end
+                if logic.REWARD_EXCLUDED_CHECKS[reward] and logic.REWARD_EXCLUDED_CHECKS[reward][check_id] then return false,"Tusk Idol placed at excluded Kali check "..check_id.." at seed "..seed end
+            end
+            local excluded=logic.REWARD_EXCLUDED_LOCATIONS[reward]
+            if excluded then
+                local check
+                for _,candidate in ipairs(logic.CHECKS) do
+                    if candidate.id==check_id then check=candidate break end
+                end
+                if check and ((check.location and excluded[check.location]) or (check.locations and excluded[check.locations[1]])) then
+                    return false,reward.." placed on its excluded route at "..check_id
+                end
             end
         end
         if count~=logic.check_count() then return false,"wrong check count at seed "..seed end
+        local least,most=math.huge,0
+        for _,reward in ipairs(logic.OVERFLOW_REWARDS) do local count=overflow_counts[reward] or 0; least=math.min(least,count); most=math.max(most,count) end
+        if most-least>1 then return false,"unbalanced overflow rewards at seed "..seed end
         local valid,route=logic.validate(first)
         if not valid or not route.victory then return false,"no victory route at seed "..seed end
     end

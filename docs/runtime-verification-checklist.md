@@ -20,6 +20,7 @@ The following adapters also need one in-game test whenever their code changes:
 | Kali Altar 1 | Earn Kali's first normal reward, die, then repeat on a new run. | The check rewards on both runs; log includes `Kali first-gift candidate`. |
 | Kali Present | Read its target group in `kir_spoiler()`, then find the first level at or after that group with both Kali and a pet. | The pet becomes a Present once; its mapped reward appears at the altar. |
 | Kali Altar 2 | Earn Kapala. | `DROP.ALTAR_KAPALA` is replaced by the mapped reward. |
+| Sun Challenge supplies | Complete the Sun Challenge. | Its separate supplies Player Bag is replaced by the mapped reward; the Arrow of Light reward remains independent. |
 | Humphead | Kill Humphead. | No crash; the native Camera and Hired Hand remain, while only the Present becomes the mapped reward; log includes `Humphead native Present replaced`. |
 | Quillback | Kill Quillback with a seed mapping it to Eggplant. | Eggplant is placed directly into the active player's hands rather than breaking as a drop. |
 | DROP-table Eggplant | Test a DROP-table reward (for example Kingu) mapped to Eggplant. | Confirm its game-specific adapter; no global Eggplant listener is used, since unrelated native Eggplants must remain untouched. |

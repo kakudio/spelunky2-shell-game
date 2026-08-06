@@ -1,6 +1,6 @@
 # Check verification ledger
 
-Last updated: 2026-08-01
+Last updated: 2026-08-04
 
 Status is intentionally based on observed in-game behavior, not merely on the
 presence of an adapter in code. A fresh logic-version change requires a new
@@ -22,7 +22,8 @@ run before treating a previous result as current.
 | `CHECK_OLMEC_ANKH` | Olmec's native Ankh reward is replaced. |
 | `CHECK_EXCALIBUR_STONE` | With collected Crown/Hedjet progression, the late-spawned sword-in-stone is replaced by the mapped reward. |
 | `CHECK_BEG_FIRST_MEETING` | Beg's first-meeting Bomb Bag reward is replaced by the mapped reward. |
-| `CHECK_KALI_PRESENT` | Earlier implementation: sacrificing a Present at a Kali altar produced the mapped reward. The new dog-to-Present source needs re-verification. |
+| `CHECK_KALI_PRESENT` | The pet-to-Present source works, and sacrificing that Present at a Kali altar produces the mapped reward. |
+| `CHECK_KALI_ALTAR_1` | Kali's first normal reward is replaced by the mapped reward. |
 | `CHECK_TUSK_IDOL` | Tusk's Idol is replaced by the mapped reward at its intended room anchor. |
 | `CHECK_SPARROW` | Sparrow's Rope Pile reward is replaced by the mapped reward. |
 | `CHECK_KINGU` | Kingu's Tablet drop is replaced by the mapped reward on defeat. |
@@ -41,20 +42,16 @@ run before treating a previous result as current.
 | `CHECK_TIAMAT` | Tiamat's reward is replaced by the mapped reward on defeat. |
 | `CHECK_ANUBIS_II` | Anubis II's reward is replaced by the mapped reward on defeat. |
 | `CHECK_ALIEN_COMPASS` | Van Horsing's Alien Compass reward is replaced by the mapped reward. |
-
-## Known regression
-
-| Check | Status |
-|---|---|
-| `CHECK_KALI_ALTAR_1` | Previously verified, but currently reported as buggy; needs diagnosis and a fresh in-game verification. |
+| `CHECK_SUN_CHALLENGE` | The Sun Challenge Arrow of Light reward is replaced by the mapped reward. |
+| `CHECK_SUN_CHALLENGE_SUPPLIES` | The Sun Challenge's separate supplies Player Bag reward is replaced by the mapped reward. |
+| `CHECK_EGGPLANT_KING` | Yama's native Eggplant Crown drop is replaced by the mapped reward. |
+| `CHECK_SPARROW_VAULT` | Sparrow's vault-completion Player Bag is replaced by the mapped reward. |
+| `CHECK_QUEEN_BEE` | Queen Bee's native Royal Jelly drop is replaced by a non-key mapped reward. |
 
 ## Implemented, not yet verified in-game
 
 | Check(s) | Test to perform |
 |---|---|
-| `CHECK_SPARROW_VAULT` | Open exactly four vault chests and speak to Sparrow; only her completion Player Bag should change. |
-| `CHECK_EGGPLANT_KING` | Complete the Eggplant chain and defeat Yama; his native Eggplant Crown should be replaced. Moai remains a vanilla interaction, not a randomizer check. |
-| `CHECK_SUN_CHALLENGE` | Complete the Sun Challenge and verify its mapped reward. |
 | True Crown recovery | Complete Beg's True Crown check while cursed and below 4 HP; verify curse removal and health restoration. Then repeat while uncursed to confirm health is unchanged. |
 
 ## Run-level verification
@@ -66,8 +63,5 @@ run before treating a previous result as current.
   it neither vanishes nor duplicates.
 - Enter Duat while holding an item and wearing a back item; verify both copies
   appear on Duat's Kali altar, while the Ankh remains consumed.
-- If the City of Gold self-sacrifice triggers a Kali check reward, verify that
-  mapped reward is also placed on Duat's Kali altar, even with Duat Item
-  Recovery disabled.
 - Complete Beg's True Crown check while cursed; verify the player is cured and
   restored to at least 4 HP, while uncursed players' health is unchanged.

@@ -4,6 +4,7 @@ local placements=require "placements"
 local adapters=require "adapters"
 local logic=require "logic"
 local sparrow=require "sparrow_adapter"
+local duat=require "duat_adapter"
 local M={}
 local materialize=adapters.materialize
 local replace_native_spawn=adapters.replace_native_spawn
@@ -46,6 +47,7 @@ local NPC_ANCHORS={
 -- only fire when the base game emits that exact DROP.
 local DROP_CONFIGS={
     {drop=DROP.KINGU_TABLETOFDESTINY,check="CHECK_KINGU",theme=THEME.ABZU,label="Kingu Tablet"},
+    {drop=DROP.QUEENBEE_ROYALJELLY,check="CHECK_QUEEN_BEE",theme=THEME.JUNGLE,label="Queen Bee Royal Jelly"},
     {drop=DROP.OLMEC_SISTERS_BOMBBOX,check="CHECK_SISTERS_OLMEC_REWARD",theme=THEME.OLMEC,label="Sisters Bomb Box"},
     {drop=DROP.OSIRIS_TABLETOFDESTINY,check="CHECK_OSIRIS",theme=THEME.DUAT,label="Osiris Tablet"},
     {drop=DROP.ANUBIS2_JETPACK,check="CHECK_ANUBIS_II",theme=THEME.DUAT,label="Anubis II Jetpack"},
@@ -288,33 +290,6 @@ local function restore_duat_recovery(ctx)
     end
     ctx.duat_recovery=nil
 end
-local function stage_duat_kali_check(ctx,previous_gifts,gifts)
-    if state.theme~=THEME.CITY_OF_GOLD then return end
-    local check=nil
-    if previous_gifts<1 and gifts>=1 then
-        check="CHECK_KALI_ALTAR_1"
-    elseif previous_gifts<2 and gifts>=2 then
-        check="CHECK_KALI_ALTAR_2"
-    end
-    if check then
-        ctx.duat_kali_check=check
-        ctx.log("City of Gold self-sacrifice triggered "..check.."; staging its mapped reward for Duat")
-    end
-end
-local function restore_duat_kali_check(ctx)
-    local check=ctx.duat_kali_check
-    if state.theme~=THEME.DUAT or not check then return end
-    local altar=duat_altar()
-    if not altar then
-        ctx.log("Duat Kali-check recovery found no FLOOR_DUAT_ALTAR; leaving "..check.." pending")
-        return
-    end
-    local uid=materialize(ctx,check,altar.x-0.65,altar.y+1,altar.layer,nil,true,false)
-    if uid then
-        ctx.duat_kali_check=nil
-        ctx.log("Duat Kali-check recovery restored "..check.." at the altar (uid "..uid..")")
-    end
-end
 local function scan_kali_present_eggplants(ctx, pending, attempt)
     ctx.defer(1,"Kali Present payload scan",function()
         if ctx.pending_kali_present_payload~=pending then return end
@@ -345,16 +320,11 @@ local function scan_kali_present_eggplants(ctx, pending, attempt)
         end
         if found or attempt>=10 then
             if not found then
-                -- Some contexts (including a Moon Challenge carrying an
-                -- Eggplant reward) consume the Present without creating
-                -- Kali's native Eggplant payload. Award this check at a
-                -- stable, visible tile immediately above the altar instead.
-                ctx.log("Kali Present scan found no matching native Eggplant after 10 frames; spawning fallback above altar")
-                local fallback_uid=materialize(ctx,"CHECK_KALI_PRESENT",pending.altar_x,pending.altar_y+1,pending.layer,nil,false,false)
-                if fallback_uid then
-                    ctx.kali_present_completed=true
-                    ctx.log("Kali Present fallback reward spawned above altar with uid "..fallback_uid)
-                end
+                -- Destruction callbacks cannot distinguish a sacrifice from a
+                -- Present that was broken beside the altar. Only the native
+                -- Eggplant payload proves a successful sacrifice; never award
+                -- a fallback here, or a broken Present would grant a check.
+                ctx.log("Kali Present scan found no native Eggplant after 10 frames; treating the Present as broken/not sacrificed and awarding no check")
             end
             -- End this short, source-scoped diagnostic window; later ordinary
             -- Eggplants must remain untouched.
@@ -535,11 +505,27 @@ local function replace_first_kali_gift(ctx,existing_items,attempt,replacement_ui
     local altar=nearest_kali_altar(player.x,player.y,player.layer)
     if not altar then ctx.log("Kali first-gift check could not find an altar") return end
     local candidates={}
+    local observed={}
+    local pending_present=ctx.pending_kali_present_payload
+    local eggplant_type=placements.type_of("ITEM_EGGPLANT")
     for _,uid in ipairs(get_entities_by(0,MASK.ITEM,LAYER.BOTH)) do
         local item=get_entity(uid)
         if item and not existing_items[uid] and item.layer==altar.layer then
             local distance=math.abs(item.x-altar.x)+math.abs(item.y-altar.y)
-            if distance<=3 and uid~=replacement_uid then
+            -- A Present sacrificed at the altar creates its own native
+            -- Eggplant payload. When Kali grants a normal favor in the same
+            -- window, that payload belongs to CHECK_KALI_PRESENT, not the
+            -- first normal-favor check.
+            local is_pending_present_payload=pending_present and item.type and item.type.id==eggplant_type
+                and item.layer==pending_present.layer
+                and math.abs(item.x-pending_present.x)<=1.25
+                and math.abs(item.y-pending_present.y)<=1.25
+            if distance<=3 then
+                table.insert(observed,string.format("uid %d type %s at %.1f, %.1f%s%s",uid,tostring(item.type and item.type.id),item.x,item.y,
+                    uid==replacement_uid and " (prior replacement)" or "",
+                    is_pending_present_payload and " (pending Present payload)" or ""))
+            end
+            if distance<=3 and uid~=replacement_uid and not is_pending_present_payload then
                 table.insert(candidates,{entity=item,distance=distance})
             end
         end
@@ -567,7 +553,7 @@ local function replace_first_kali_gift(ctx,existing_items,attempt,replacement_ui
             ctx.defer(1,"Kali first-gift cleanup",function() replace_first_kali_gift(ctx,existing_items,(attempt or 1)+1,replacement_uid) end)
         end
     elseif not candidate then
-        ctx.log("Kali first-gift check found no generated reward item near altar")
+        ctx.log("Kali first-gift check found no generated reward item near altar; new nearby items: "..(#observed>0 and table.concat(observed,"; ") or "none"))
     end
 end
 local function yang_position(ctx, yang)
@@ -799,19 +785,20 @@ local function attach_true_crown_recovery(ctx)
 end
 
 function M.on_post_level_generation(ctx)
-    if state.theme==THEME.DUAT then
-        restore_duat_kali_check(ctx)
-        restore_duat_recovery(ctx)
-    elseif state.theme~=THEME.CITY_OF_GOLD then
-        -- A transition other than City of Gold -> Duat must not carry an old
-        -- snapshot into a later, unrelated Duat visit.
-        ctx.duat_recovery=nil
-    end
+    duat.on_post_level_generation(ctx)
     -- Present identities are level-local. Clearing them here prevents an item
     -- left on a prior level from being mistaken for a sacrifice on this one.
     ctx.kali_presents={}
     local theme=state.theme
     local items=get_entities_by(0,MASK.ITEM,LAYER.BOTH)
+    -- Sun Challenge's supplies bag has special player-texture setup. Capture
+    -- bags already present when the level is built so the post-spawn adapter
+    -- below handles only the reward emitted after challenge completion.
+    ctx.sun_challenge_bags={}
+    if theme==THEME.SUNKEN_CITY then
+        local playerbag_type=placements.type_of("ITEM_PICKUP_PLAYERBAG")
+        for _,uid in ipairs(playerbag_type and get_entities_by_type(playerbag_type) or {}) do ctx.sun_challenge_bags[uid]=true end
+    end
     ctx.log(string.format("Scanning %d item entities in theme %s",#items,tostring(theme)))
     for _,anchor in ipairs(ITEM_ANCHORS) do
         if anchor.post_generation~=false and theme==anchor.theme and (not anchor.level or state.level==anchor.level) and players_have_any(anchor.requires_any) then
@@ -957,9 +944,7 @@ end
 
 function M.register_spawn_hooks(ctx)
     sparrow.register(ctx)
-    set_callback(function()
-        snapshot_duat_recovery(ctx)
-    end,ON.FRAME)
+    duat.register(ctx)
     local present_type=placements.type_of("ITEM_PRESENT")
     local anubis2_type=placements.type_of("MONS_ANUBIS2")
     if anubis2_type then
@@ -1176,6 +1161,30 @@ function M.register_spawn_hooks(ctx)
         end,SPAWN_TYPE.ANY,MASK.ITEM,present_type)
     end
 
+    -- Do not use DROP.CHALLENGESUN_PLAYERBAG here. The native Sun Challenge
+    -- applies Player Bag-specific texture logic to its output, which is unsafe
+    -- when a direct DROP replacement changes it into an arbitrary reward.
+    -- Let that setup finish, then replace the exact newly emitted bag.
+    local sun_playerbag_type=placements.type_of("ITEM_PICKUP_PLAYERBAG")
+    if sun_playerbag_type then
+        set_post_entity_spawn(function(entity)
+            if entity.type.id~=sun_playerbag_type or state.theme~=THEME.SUNKEN_CITY or ctx.randomizer_state.level_materialized.CHECK_SUN_CHALLENGE_SUPPLIES then return end
+            if ctx.sun_challenge_bags and ctx.sun_challenge_bags[entity.uid] then return end
+            local sun_challenge=state.logic and state.logic.tun_sun_challenge
+            if not sun_challenge then return end
+            local uid,x,y,layer=entity.uid,entity.x,entity.y,entity.layer
+            ctx.sun_challenge_bags=ctx.sun_challenge_bags or {}
+            ctx.sun_challenge_bags[uid]=true
+            ctx.defer(1,"Sun Challenge supplies Player Bag replacement",function()
+                if ctx.randomizer_state.level_materialized.CHECK_SUN_CHALLENGE_SUPPLIES then return end
+                local replacement_uid=materialize(ctx,"CHECK_SUN_CHALLENGE_SUPPLIES",x,y,layer,uid,true)
+                ctx.log("Sun Challenge supplies Player Bag replaced after native setup (uid "..tostring(replacement_uid)..")")
+            end)
+        end,SPAWN_TYPE.ANY,MASK.ITEM,sun_playerbag_type)
+    else
+        ctx.log("Sun Challenge supplies adapter unavailable: ITEM_PICKUP_PLAYERBAG is missing")
+    end
+
     -- Tusk's fifth successful seven is the final prize. At four prizes won,
     -- substitute only an item emitted beside her prize dispenser; ordinary
     -- shop spawns and the first four prizes remain vanilla.
@@ -1213,12 +1222,14 @@ function M.register_spawn_hooks(ctx)
             return
         end
         if gifts>ctx.kali_last_gifts then
-            stage_duat_kali_check(ctx,ctx.kali_last_gifts,gifts)
-            if ctx.kali_last_gifts<1 and gifts>=1 and not ctx.kali_present_sacrifice_pending and not ctx.kali_present_completed then
+            ctx.log(string.format("Kali gift counter changed: %s -> %s (Present pending=%s completed=%s)",tostring(ctx.kali_last_gifts),tostring(gifts),tostring(ctx.kali_present_sacrifice_pending),tostring(ctx.kali_present_completed)))
+            if ctx.kali_last_gifts<1 and gifts>=1 and not ctx.kali_present_completed then
                 local items_before=ctx.kali_known_items or {}
+                if ctx.kali_present_sacrifice_pending then
+                    ctx.log("Kali normal gift occurred while the Present replacement was pending; resolving both rewards separately")
+                end
+                ctx.log("Kali first-gift replacement scheduled with "..tostring(next(items_before) and "a prior item snapshot" or "an empty prior item snapshot"))
                 ctx.defer(1,"Kali first-gift replacement",function() replace_first_kali_gift(ctx,items_before) end)
-            elseif ctx.kali_last_gifts<1 and gifts>=1 then
-                ctx.log("Kali normal gift occurred while the Present replacement was still pending; skipping this reward")
             end
             ctx.kali_last_gifts=gifts
         end
