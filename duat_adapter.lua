@@ -79,6 +79,13 @@ local function held(uid)
     for _,player in ipairs(players or {}) do if entity_has_item_uid(player.uid,uid) then return true end end
     return false
 end
+local function world_position(uid,entity)
+    if get_position then
+        local ok,x,y,layer=pcall(get_position,uid)
+        if ok and x and y and layer~=nil then return x,y,layer end
+    end
+    return entity.x,entity.y,entity.layer
+end
 local function allowed(ctx,t)
     if not ctx.duat_recovery_altar_types then
         local types={}
@@ -93,13 +100,18 @@ local function scan_altar_items(ctx)
     local altar_type=placements.type_of("FLOOR_ALTAR"); local seen={}
     for _,altar_uid in ipairs(altar_type and get_entities_by_type(altar_type) or {}) do
         local altar=get_entity(altar_uid)
+        local altar_x,altar_y,altar_layer
+        if altar then altar_x,altar_y,altar_layer=world_position(altar_uid,altar) end
         if altar then for _,uid in ipairs(get_entities_by(0,MASK.ITEM,LAYER.BOTH)) do
             local item=get_entity(uid)
+            local item_x,item_y,item_layer
+            if item then item_x,item_y,item_layer=world_position(uid,item) end
             -- Capture a 9-by-1.5-tile band immediately above the altar. This
             -- gives dropped items room to settle or bounce without preserving
-            -- items that were only briefly in the altar area.
-            if not seen[uid] and item and item.type and allowed(ctx,item.type.id) and item.layer==altar.layer and not held(uid)
-                and math.abs(item.x-altar.x)<=4.5 and math.abs(item.y-(altar.y+1))<=0.75 then
+            -- items that were only briefly in the altar area. Use world
+            -- positions: Entity.x/y can be an overlay-relative hand offset.
+            if not seen[uid] and item and item.type and allowed(ctx,item.type.id) and item_layer==altar_layer and not held(uid)
+                and math.abs(item_x-altar_x)<=4.5 and math.abs(item_y-(altar_y+1))<=0.75 then
                 seen[uid]=true; table.insert(recovered,{type=item.type.id,kind="near Kali altar",player=0,uid=uid})
             end
         end end
@@ -137,7 +149,8 @@ local function tracked_item_statuses(ctx,recovered)
         local tracked=ctx.duat_recovery_seen_items[uid]
         local item=get_entity(uid)
         if item then
-            table.insert(statuses,string.format("%s uid %s at %.1f, %.1f layer %s held=%s eligible=%s",name_of(tracked.type),tostring(uid),item.x,item.y,tostring(item.layer),tostring(held(uid)),tostring(eligible[uid] or false)))
+            local x,y,layer=world_position(uid,item)
+            table.insert(statuses,string.format("%s uid %s at %.1f, %.1f layer %s held=%s eligible=%s",name_of(tracked.type),tostring(uid),x,y,tostring(layer),tostring(held(uid)),tostring(eligible[uid] or false)))
         else
             table.insert(statuses,string.format("%s uid %s no longer exists eligible=false",name_of(tracked.type),tostring(uid)))
         end
