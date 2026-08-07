@@ -34,11 +34,11 @@ register_group("e_balance_group","Balance")
 register_option_bool("f_kali_item_recovery","Kali Item Recovery","Restore held, equipped, and allowed altar-dropped items from the City of Gold to Duat.",saved_option("f_kali_item_recovery",true,"f_duat_item_recovery","d_duat_item_recovery","duat_item_recovery"))
 register_option_bool("g_balanced_duat_kali_rewards","Balanced Duat Kali Rewards","Replace the special Duat altar's favor rewards with balanced Player Bag and Royal Jelly rewards.",saved_option("g_balanced_duat_kali_rewards",true,"f_duat_item_recovery","d_duat_item_recovery","duat_item_recovery"))
 register_option_bool("h_true_crown_restoration","True Crown Restoration","Remove Beg's curse and restore the player to at least 4 HP after the True Crown encounter.",saved_option("h_true_crown_restoration",true))
-register_group("i_logging_group","Logging")
-register_option_bool("j_generate_spoiler","Generate Spoiler","Include the full randomized check mapping in the per-run report.",saved_option("j_generate_spoiler",true,"i_generate_spoiler","i_run_reports","e_run_reports","run_reports"))
-register_option_bool("k_generate_logs","Generate Logs","Include Key Item Randomizer logs in the same per-run report.",saved_option("k_generate_logs",true,"j_generate_logs","i_run_reports","e_run_reports","run_reports"))
 local developer_options=build_config.developer_options==true
 if developer_options then
+    register_group("i_logging_group","Logging")
+    register_option_bool("j_generate_spoiler","Generate Spoiler","Include the full randomized check mapping in the per-run report.",saved_option("j_generate_spoiler",true,"i_generate_spoiler","i_run_reports","e_run_reports","run_reports"))
+    register_option_bool("k_generate_logs","Generate Logs","Include Key Item Randomizer logs in the same per-run report.",saved_option("k_generate_logs",true,"j_generate_logs","i_run_reports","e_run_reports","run_reports"))
     register_group("m_developer_group","Developer")
     register_option_bool("n_dev_use_adventure_seed","Use Adventure Run Seed","Apply the seed pair below immediately before each new run starts.",saved_option("n_dev_use_adventure_seed",false))
     register_option_string("o_dev_adventure_seed","Adventure Run Seed","Two signed integers from a run report, in the form first,second.",saved_option("o_dev_adventure_seed",""))
@@ -177,9 +177,14 @@ set_callback(function()
     -- not begin in 1-1, so reset unconditionally here.
     runtime.reset_run(runtime_context)
     if not options.b_enabled then return end
-    local report_path=logger.begin_run(randomizer_state,logic,options.j_generate_spoiler,options.k_generate_logs)
+    -- Release builds always retain a complete report so players can attach it
+    -- when reporting an issue. The developer archive exposes the two controls
+    -- above for focused testing.
+    local generate_spoiler=not developer_options or options.j_generate_spoiler
+    local generate_logs=not developer_options or options.k_generate_logs
+    local report_path=logger.begin_run(randomizer_state,logic,generate_spoiler,generate_logs)
     if report_path then log("Run report started: Mods/Data/KeyItemRandomizer/"..report_path)
-    elseif options.j_generate_spoiler or options.k_generate_logs then log("WARNING: could not create this run's report file") end
+    elseif generate_spoiler or generate_logs then log("WARNING: could not create this run's report file") end
     log("Reset Crown/Hedjet progression for new run")
     if developer_options and options.q_dev_test_resources then
         for _,player in ipairs(players) do
