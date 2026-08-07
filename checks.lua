@@ -47,7 +47,10 @@ local NPC_ANCHORS={
 -- only fire when the base game emits that exact DROP.
 local DROP_CONFIGS={
     {drop=DROP.KINGU_TABLETOFDESTINY,check="CHECK_KINGU",theme=THEME.ABZU,label="Kingu Tablet"},
-    {drop=DROP.QUEENBEE_ROYALJELLY,check="CHECK_QUEEN_BEE",theme=THEME.JUNGLE,label="Queen Bee Royal Jelly"},
+    -- Queen Bee can be created outside Jungle by test tools or custom level
+    -- setups. Her engine DROP is specific to her, so keep the replacement
+    -- armed globally rather than silently falling back to Royal Jelly there.
+    {drop=DROP.QUEENBEE_ROYALJELLY,check="CHECK_QUEEN_BEE",label="Queen Bee Royal Jelly"},
     {drop=DROP.OLMEC_SISTERS_BOMBBOX,check="CHECK_SISTERS_OLMEC_REWARD",theme=THEME.OLMEC,label="Sisters Bomb Box"},
     {drop=DROP.OSIRIS_TABLETOFDESTINY,check="CHECK_OSIRIS",theme=THEME.DUAT,label="Osiris Tablet"},
     {drop=DROP.ANUBIS2_JETPACK,check="CHECK_ANUBIS_II",theme=THEME.DUAT,label="Anubis II Jetpack"},
@@ -889,7 +892,7 @@ function M.on_post_level_generation(ctx)
     if theme==THEME.DWELLING then
         attach_delayed_death_reward(ctx,"MONS_CAVEMAN_BOSS","CHECK_QUILLBACK","quillback_hooks","pending_quillback_drop","Quillback death")
     end
-    if theme==THEME.JUNGLE then attach_queen_bee_diagnostics(ctx) end
+    attach_queen_bee_diagnostics(ctx)
     -- Tiamat has no item drop to intercept. Her check is earned on death, so
     -- wait for her death animation rather than materializing at level start.
     if theme==THEME.TIAMAT then
@@ -1019,7 +1022,6 @@ function M.register_spawn_hooks(ctx)
     local queen_type=placements.type_of("MONS_QUEENBEE")
     if queen_type then
         set_post_entity_spawn(function(entity)
-            if state.theme~=THEME.JUNGLE then return end
             ctx.log(string.format("Queen Bee spawned uid %s at %.1f, %.1f layer %s; drop replacement armed=%s",tostring(entity.uid),entity.x,entity.y,tostring(entity.layer),tostring(ctx.drop_configured[DROP.QUEENBEE_ROYALJELLY]~=nil)))
             attach_queen_bee_diagnostics(ctx)
         end,SPAWN_TYPE.ANY,0,queen_type)
