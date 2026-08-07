@@ -8,6 +8,7 @@ local LEVEL_TABLES={
     "humphead_hooks", "yeti_hooks", "lahamu_hooks", "vlad_hooks", "tiamat_hooks", "eggplant_king_hooks",
     "moon_bows", "moon_hidden_bows",
     "sun_challenge_bags",
+    "duat_recovery_seen_items",
 }
 
 function M.new(randomizer_state, initialize, log, is_kali_item_recovery_enabled, is_balanced_duat_kali_rewards_enabled, is_true_crown_restoration_enabled)
@@ -25,6 +26,7 @@ function M.new(randomizer_state, initialize, log, is_kali_item_recovery_enabled,
         pending_true_crown_delivery=nil,
         duat_recovery_signature=nil, duat_recovery_empty_logged=false,
         duat_recovery_scan_signature=nil,
+        duat_recovery_seen_items={},
         sparrow_last_state=nil, sparrow_last_transition=nil,
         drop_configured={}, humphead_drop_configured=false,
         progression={crown=false,hedjet=false,pending_gate_items={}},

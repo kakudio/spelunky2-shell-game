@@ -122,6 +122,29 @@ local function scan_signature(items)
     return table.concat(entries,";")
 end
 
+local function tracked_item_statuses(ctx,recovered)
+    ctx.duat_recovery_seen_items=ctx.duat_recovery_seen_items or {}
+    local eligible={}
+    for _,item in ipairs(recovered) do
+        ctx.duat_recovery_seen_items[item.uid]={type=item.type,uid=item.uid}
+        eligible[item.uid]=true
+    end
+    local uids={}
+    for uid in pairs(ctx.duat_recovery_seen_items) do table.insert(uids,uid) end
+    table.sort(uids)
+    local statuses={}
+    for _,uid in ipairs(uids) do
+        local tracked=ctx.duat_recovery_seen_items[uid]
+        local item=get_entity(uid)
+        if item then
+            table.insert(statuses,string.format("%s uid %s at %.1f, %.1f layer %s held=%s eligible=%s",name_of(tracked.type),tostring(uid),item.x,item.y,tostring(item.layer),tostring(held(uid)),tostring(eligible[uid] or false)))
+        else
+            table.insert(statuses,string.format("%s uid %s no longer exists eligible=false",name_of(tracked.type),tostring(uid)))
+        end
+    end
+    return statuses
+end
+
 local function log_altar_scan_changes(ctx)
     if not recovery_enabled(ctx) or state.theme~=THEME.CITY_OF_GOLD then return end
     local recovered=scan_altar_items(ctx)
@@ -135,7 +158,9 @@ local function log_altar_scan_changes(ctx)
     ctx.duat_recovery=recovered
     ctx.duat_recovery_empty_logged=#recovered==0
     local labels=labels_for(recovered)
-    ctx.log(#labels>0 and "Duat recovery altar scan changed; cached snapshot: "..table.concat(labels,"; ") or "Duat recovery altar scan changed; cached snapshot is empty")
+    local statuses=tracked_item_statuses(ctx,recovered)
+    local detail=#statuses>0 and "; tracked items: "..table.concat(statuses,"; ") or ""
+    ctx.log((#labels>0 and "Duat recovery altar scan changed; cached snapshot: "..table.concat(labels,"; ") or "Duat recovery altar scan changed; cached snapshot is empty")..detail)
 end
 
 local function restore_items(ctx)
@@ -157,8 +182,11 @@ function M.register(ctx)
     register_favor_rewards(ctx)
     set_callback(function()
         if state.theme==THEME.CITY_OF_GOLD and state.theme_next==THEME.DUAT then
-            local labels=labels_for(ctx.duat_recovery or {})
-            ctx.log(#labels>0 and "Duat recovery ON.TRANSITION at frame "..tostring(get_frame and get_frame() or -1).."; preserving cached altar snapshot: "..table.concat(labels,"; ") or "Duat recovery ON.TRANSITION at frame "..tostring(get_frame and get_frame() or -1).."; cached altar snapshot is empty")
+            local recovered=ctx.duat_recovery or {}
+            local labels=labels_for(recovered)
+            local statuses=tracked_item_statuses(ctx,recovered)
+            local detail=#statuses>0 and "; tracked items: "..table.concat(statuses,"; ") or ""
+            ctx.log((#labels>0 and "Duat recovery ON.TRANSITION at frame "..tostring(get_frame and get_frame() or -1).."; preserving cached altar snapshot: "..table.concat(labels,"; ") or "Duat recovery ON.TRANSITION at frame "..tostring(get_frame and get_frame() or -1).."; cached altar snapshot is empty")..detail)
         end
     end,ON.TRANSITION)
     set_callback(function() log_altar_scan_changes(ctx) end,ON.FRAME)
