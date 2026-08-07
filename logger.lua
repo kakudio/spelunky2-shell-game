@@ -2,7 +2,9 @@
 -- through runtime state, so changing destinations happens here only.
 
 local run_report=require "run_report"
-local M={overlay_runtime_logs=false}
+-- Keep file reports for sharing, but also surface live diagnostics in the
+-- Playlunky overlay while we investigate runtime behavior.
+local M={overlay_runtime_logs=true}
 
 function M.log(message)
     run_report.log(message)
