@@ -5,6 +5,7 @@ local placements=require "placements"
 local tests=require "tests"
 local runtime=require "runtime_state"
 local logger=require "logger"
+local build_config=require "build_config"
 local persisted_options=options
 local options
 
@@ -37,8 +38,24 @@ register_group("i_logging_group","Logging")
 register_option_bool("j_generate_spoiler","Generate Spoiler","Include the full randomized check mapping in the per-run report.",saved_option("j_generate_spoiler",true,"i_generate_spoiler","i_run_reports","e_run_reports","run_reports"))
 register_option_bool("k_generate_logs","Generate Logs","Include Key Item Randomizer logs in the same per-run report.",saved_option("k_generate_logs",true,"j_generate_logs","i_run_reports","e_run_reports","run_reports"))
 register_option_bool("l_test_resources","Test: Start with resources and progression items","Give each player the test loadout used for check verification.",saved_option("l_test_resources",true,"k_test_resources","g_test_resources","f_test_resources","test_resources"))
+local developer_options=build_config.developer_options==true
+if developer_options then
+    register_group("m_developer_group","Developer")
+    register_option_bool("n_dev_use_adventure_seed","Use Adventure Run Seed","Apply the seed pair below immediately before each new run starts.",saved_option("n_dev_use_adventure_seed",false))
+    register_option_string("o_dev_adventure_seed","Adventure Run Seed","Two signed integers from a run report, in the form first,second.",saved_option("o_dev_adventure_seed",""))
+    register_option_bool("p_dev_in_game_logging","In-Game Logging","Show Key Item Randomizer runtime logs in the Playlunky overlay.",saved_option("p_dev_in_game_logging",build_config.default_overlay_runtime_logs==true))
+end
 options=_G.options or persisted_options or {}
 register_option_button("c_new_seed","New Seed","",function() options.d_seed=0 end)
+
+local function sync_developer_options()
+    logger.set_overlay_runtime_logs(developer_options and options.p_dev_in_game_logging)
+end
+local function parse_adventure_seed(value)
+    local first,second=tostring(value or ""):match("^%s*([%-]?%d+)%s*,%s*([%-]?%d+)%s*$")
+    return first and tonumber(first) or nil,second and tonumber(second) or nil
+end
+sync_developer_options()
 
 local randomizer_state={seed=0,mapping=nil,initialized=false,level_materialized={}}
 local runtime_context=nil
@@ -136,6 +153,23 @@ local function on_post_level_generation()
 end
 checks.register_spawn_hooks(runtime_context)
 set_callback(on_post_level_generation,ON.POST_LEVEL_GENERATION)
+set_callback(sync_developer_options,ON.GAMEFRAME)
+if developer_options then
+    set_callback(function()
+        if not options.n_dev_use_adventure_seed then return end
+        local first,second=parse_adventure_seed(options.o_dev_adventure_seed)
+        if not first or not second then
+            log("Developer Adventure Run Seed ignored: enter two signed integers as first,second")
+            return
+        end
+        if not set_adventure_seed then
+            log("Developer Adventure Run Seed unavailable: this Playlunky version has no set_adventure_seed API")
+            return
+        end
+        set_adventure_seed(first,second)
+        log("Developer Adventure Run Seed applied: "..tostring(first)..","..tostring(second))
+    end,ON.RESET)
+end
 set_callback(function() if options.b_enabled and not randomizer_state.initialized then initialize() end end,ON.START)
 set_callback(function()
     -- The mapping is seed-stable, but collected progression belongs to one

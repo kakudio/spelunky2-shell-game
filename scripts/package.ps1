@@ -26,6 +26,7 @@ $packageFiles = @(
     "runtime_state.lua",
     "run_report.lua",
     "logger.lua",
+    "build_config.lua",
     "tests.lua",
     "mod.json"
 )
@@ -43,12 +44,29 @@ if ([System.IO.Path]::IsPathRooted($OutputDirectory)) {
 }
 New-Item -ItemType Directory -Force -Path $resolvedOutputDirectory | Out-Null
 
-$archiveName = "KeyItemRandomizer-v$($manifest.version).zip"
-$archivePath = Join-Path $resolvedOutputDirectory $archiveName
-if (Test-Path -LiteralPath $archivePath) {
-    Remove-Item -LiteralPath $archivePath -Force
+$temporaryRoot=Join-Path ([System.IO.Path]::GetTempPath()) ("KeyItemRandomizer-package-"+[Guid]::NewGuid().ToString("N"))
+try {
+    New-Item -ItemType Directory -Force -Path $temporaryRoot | Out-Null
+    $variants=@(
+        @{ Suffix=""; Developer=$false; OverlayLogging=$false },
+        @{ Suffix="-dev"; Developer=$true; OverlayLogging=$true }
+    )
+    foreach ($variant in $variants) {
+        $stageDirectory=Join-Path $temporaryRoot ("stage"+$variant.Suffix)
+        New-Item -ItemType Directory -Force -Path $stageDirectory | Out-Null
+        foreach ($file in $packageFiles) {
+            Copy-Item -LiteralPath (Join-Path $projectRoot $file) -Destination (Join-Path $stageDirectory $file)
+        }
+        $developerValue=$variant.Developer.ToString().ToLowerInvariant()
+        $loggingValue=$variant.OverlayLogging.ToString().ToLowerInvariant()
+        [System.IO.File]::WriteAllText((Join-Path $stageDirectory "build_config.lua"),"return { developer_options=$developerValue, default_overlay_runtime_logs=$loggingValue }`n")
+        $archiveName="KeyItemRandomizer-v$($manifest.version)$($variant.Suffix).zip"
+        $archivePath=Join-Path $resolvedOutputDirectory $archiveName
+        if (Test-Path -LiteralPath $archivePath) { Remove-Item -LiteralPath $archivePath -Force }
+        $sourcePaths=$packageFiles | ForEach-Object { Join-Path $stageDirectory $_ }
+        Compress-Archive -LiteralPath $sourcePaths -DestinationPath $archivePath -CompressionLevel Optimal
+        Write-Host "Created $archivePath"
+    }
+} finally {
+    if (Test-Path -LiteralPath $temporaryRoot) { Remove-Item -LiteralPath $temporaryRoot -Recurse -Force }
 }
-
-$sourcePaths = $packageFiles | ForEach-Object { Join-Path $projectRoot $_ }
-Compress-Archive -LiteralPath $sourcePaths -DestinationPath $archivePath -CompressionLevel Optimal
-Write-Host "Created $archivePath"
