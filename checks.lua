@@ -821,6 +821,30 @@ local function attach_queen_bee_diagnostics(ctx)
     end
 end
 
+local function observe_pending_quest_reward(ctx,entity)
+    local queen_pending=ctx.pending_queen_bee_drop
+    if queen_pending and entity and entity.layer==queen_pending.layer and math.abs(entity.x-queen_pending.x)+math.abs(entity.y-queen_pending.y)<=12 then
+        local reward,mapped_type=placements.reward_type(ctx.randomizer_state,"CHECK_QUEEN_BEE")
+        local jelly_type=placements.type_of("ITEM_PICKUP_ROYALJELLY")
+        if entity.type.id==jelly_type or entity.type.id==mapped_type then
+            ctx.pending_queen_bee_drop=nil
+            local kind=entity.type.id==jelly_type and "native Royal Jelly" or "mapped reward "..tostring(reward)
+            ctx.log("Queen Bee reward observed: "..kind.." uid "..entity.uid.." (type "..entity.type.id..")")
+        end
+    end
+    local crown_pending=ctx.pending_true_crown_delivery
+    if crown_pending and entity and entity.layer==crown_pending.layer and math.abs(entity.x-crown_pending.x)+math.abs(entity.y-crown_pending.y)<=12 then
+        local _,mapped_type=placements.reward_type(ctx.randomizer_state,"CHECK_BEG_TRUE_CROWN")
+        local native_type=placements.type_of("ITEM_PICKUP_TRUECROWN")
+        if entity.type.id==mapped_type or entity.type.id==native_type then
+            ctx.pending_true_crown_delivery=nil
+            ctx.log("Beg True Crown reward observed as uid "..entity.uid.."; scheduling restoration")
+            -- Let the native encounter finish applying its curse before curing it.
+            ctx.defer(2,"True Crown reward restoration",function() restore_true_crown_players(ctx) end)
+        end
+    end
+end
+
 function M.on_post_level_generation(ctx)
     -- Present identities are level-local. Clearing them here prevents an item
     -- left on a prior level from being mistaken for a sacrifice on this one.
@@ -1028,35 +1052,15 @@ function M.register_spawn_hooks(ctx)
     else
         ctx.log("Queen Bee diagnostics unavailable: MONS_QUEENBEE entity type missing")
     end
-    -- The Queen Bee's DROP replacement is engine-owned.  Observe only the
-    -- native Royal Jelly or the configured mapped reward near her death, so
-    -- this diagnostic cannot confuse unrelated Jungle items with her check.
-    set_post_entity_spawn(function(entity)
-        local pending=ctx.pending_queen_bee_drop
-        if not pending or not entity or entity.layer~=pending.layer or math.abs(entity.x-pending.x)+math.abs(entity.y-pending.y)>12 then return end
-        local reward,mapped_type=placements.reward_type(ctx.randomizer_state,"CHECK_QUEEN_BEE")
-        local jelly_type=placements.type_of("ITEM_PICKUP_ROYALJELLY")
-        if entity.type.id~=jelly_type and entity.type.id~=mapped_type then return end
-        ctx.pending_queen_bee_drop=nil
-        local kind=entity.type.id==jelly_type and "native Royal Jelly" or "mapped reward "..tostring(reward)
-        ctx.log("Queen Bee reward observed: "..kind.." uid "..entity.uid.." (type "..entity.type.id..")")
-    end,SPAWN_TYPE.ANY,0,0)
-    -- `replace_drop` swaps the engine's True Crown DROP directly, so there is
-    -- no replacement callback to use.  Observe entity spawns only while a
-    -- particular Beg reward is pending, then match the configured reward at
-    -- his location before applying the optional balance restoration.
-    set_post_entity_spawn(function(entity)
-        local pending=ctx.pending_true_crown_delivery
-        if not pending or not entity or entity.layer~=pending.layer then return end
-        if math.abs(entity.x-pending.x)+math.abs(entity.y-pending.y)>12 then return end
-        local _,mapped_type=placements.reward_type(ctx.randomizer_state,"CHECK_BEG_TRUE_CROWN")
-        local native_type=placements.type_of("ITEM_PICKUP_TRUECROWN")
-        if entity.type.id~=mapped_type and entity.type.id~=native_type then return end
-        ctx.pending_true_crown_delivery=nil
-        ctx.log("Beg True Crown reward observed as uid "..entity.uid.."; scheduling restoration")
-        -- Let the native encounter finish applying its curse before curing it.
-        ctx.defer(2,"True Crown reward restoration",function() restore_true_crown_players(ctx) end)
-    end,SPAWN_TYPE.ANY,0,0)
+    -- A type value of 0 does not act as an all-entity post-spawn listener in
+    -- every Playlunky build. Register the same narrowly scoped observer for
+    -- each possible reward entity type instead, so direct DROP replacements
+    -- can be observed reliably.
+    for _,reward_type in ipairs(placements.reward_entity_types()) do
+        set_post_entity_spawn(function(entity)
+            observe_pending_quest_reward(ctx,entity)
+        end,SPAWN_TYPE.ANY,0,reward_type)
+    end
     -- `touch` becomes zero on a player pickup. We only track the particular
     -- Crown/Hedjet entities this randomizer materialized, so other items do
     -- not accidentally satisfy the logic gate.

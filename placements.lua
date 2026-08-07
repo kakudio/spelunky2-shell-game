@@ -34,6 +34,18 @@ function M.reward_type(randomizer_state, check_id)
     return reward, reward and M.type_of(REWARD_ENTITY_NAMES[reward]) or nil
 end
 
+function M.reward_entity_types()
+    local seen,types={},{}
+    for _,name in pairs(REWARD_ENTITY_NAMES) do
+        local entity_type=M.type_of(name)
+        if entity_type and not seen[entity_type] then
+            seen[entity_type]=true
+            table.insert(types,entity_type)
+        end
+    end
+    return types
+end
+
 function M.spawn(ent_type,x,y,layer,snap_to_floor)
     if snap_to_floor then return spawn_entity_snapped_to_floor(ent_type,x,y,layer) end
     return spawn_entity(ent_type,x,y,layer,0,0)
