@@ -779,13 +779,33 @@ local function attach_true_crown_delivery(ctx)
             ctx.beg_hooks[uid]=true
             beg:set_pre_kill(function(self)
                 local quests=state.quests
-                if (ctx.is_true_crown_restoration_enabled and not ctx.is_true_crown_restoration_enabled()) or ctx.beg_true_crown_healed or not quests or (quests.beg_state or 0)<4 then return end
+                local beg_state=quests and quests.beg_state or nil
+                if ctx.is_true_crown_restoration_enabled and not ctx.is_true_crown_restoration_enabled() then
+                    ctx.log("Beg uid "..self.uid.." pre-kill ignored: True Crown Restoration is disabled")
+                    return
+                end
+                if ctx.beg_true_crown_healed or not quests or (beg_state or 0)<4 then
+                    ctx.log("Beg uid "..self.uid.." pre-kill did not arm True Crown restoration; beg_state="..tostring(beg_state))
+                    return
+                end
                 -- Beg's death only identifies the short window in which the
                 -- native True Crown reward is emitted.  The recovery itself
                 -- is performed only after that actual reward has spawned.
                 local pending={x=self.x,y=self.y,layer=self.layer}
                 ctx.pending_true_crown_delivery=pending
-                ctx.log(string.format("Beg True Crown reward pending at %.1f, %.1f layer %s",pending.x,pending.y,tostring(pending.layer)))
+                ctx.log(string.format("Beg True Crown reward pending at %.1f, %.1f layer %s (beg_state=%s)",pending.x,pending.y,tostring(pending.layer),tostring(beg_state)))
+                -- Direct DROP substitutions can bypass post-spawn callbacks
+                -- in some Playlunky builds.  The quest state above proves
+                -- this is the True Crown event, so complete the optional
+                -- restoration after its native reward sequence if no direct
+                -- spawn observation arrived first.
+                ctx.defer(5,"True Crown delivery fallback",function()
+                    if ctx.pending_true_crown_delivery==pending then
+                        ctx.pending_true_crown_delivery=nil
+                        ctx.log("Beg True Crown reward was not observed directly; applying post-delivery restoration fallback")
+                        restore_true_crown_players(ctx)
+                    end
+                end)
                 ctx.defer(30,"True Crown delivery window",function()
                     if ctx.pending_true_crown_delivery==pending then
                         ctx.pending_true_crown_delivery=nil
