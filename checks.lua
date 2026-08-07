@@ -795,6 +795,29 @@ local function attach_true_crown_delivery(ctx)
     end
 end
 
+local function attach_queen_bee_diagnostics(ctx)
+    local queen_type=placements.type_of("MONS_QUEENBEE")
+    for _,uid in ipairs(queen_type and get_entities_by_type(queen_type) or {}) do
+        local queen=get_entity(uid)
+        if queen and not ctx.queen_bee_hooks[uid] then
+            ctx.queen_bee_hooks[uid]=true
+            queen:set_pre_kill(function(self)
+                local reward=ctx.drop_configured[DROP.QUEENBEE_ROYALJELLY]
+                local pending={x=self.x,y=self.y,layer=self.layer}
+                ctx.pending_queen_bee_drop=pending
+                ctx.log(string.format("Queen Bee uid %s pre-kill at %.1f, %.1f layer %s; configured reward=%s",tostring(self.uid),pending.x,pending.y,tostring(pending.layer),tostring(reward)))
+                ctx.defer(30,"Queen Bee reward diagnostic window",function()
+                    if ctx.pending_queen_bee_drop==pending then
+                        ctx.pending_queen_bee_drop=nil
+                        ctx.log("Queen Bee reward diagnostic: no native Royal Jelly or mapped reward observed within 30 frames")
+                    end
+                end)
+            end)
+            ctx.log("Attached Queen Bee reward diagnostics to uid "..uid)
+        end
+    end
+end
+
 function M.on_post_level_generation(ctx)
     -- Present identities are level-local. Clearing them here prevents an item
     -- left on a prior level from being mistaken for a sacrifice on this one.
@@ -866,6 +889,7 @@ function M.on_post_level_generation(ctx)
     if theme==THEME.DWELLING then
         attach_delayed_death_reward(ctx,"MONS_CAVEMAN_BOSS","CHECK_QUILLBACK","quillback_hooks","pending_quillback_drop","Quillback death")
     end
+    if theme==THEME.JUNGLE then attach_queen_bee_diagnostics(ctx) end
     -- Tiamat has no item drop to intercept. Her check is earned on death, so
     -- wait for her death animation rather than materializing at level start.
     if theme==THEME.TIAMAT then
@@ -992,6 +1016,29 @@ function M.register_spawn_hooks(ctx)
             attach_true_crown_delivery(ctx)
         end,SPAWN_TYPE.ANY,0,beg_type)
     end
+    local queen_type=placements.type_of("MONS_QUEENBEE")
+    if queen_type then
+        set_post_entity_spawn(function(entity)
+            if state.theme~=THEME.JUNGLE then return end
+            ctx.log(string.format("Queen Bee spawned uid %s at %.1f, %.1f layer %s; drop replacement armed=%s",tostring(entity.uid),entity.x,entity.y,tostring(entity.layer),tostring(ctx.drop_configured[DROP.QUEENBEE_ROYALJELLY]~=nil)))
+            attach_queen_bee_diagnostics(ctx)
+        end,SPAWN_TYPE.ANY,0,queen_type)
+    else
+        ctx.log("Queen Bee diagnostics unavailable: MONS_QUEENBEE entity type missing")
+    end
+    -- The Queen Bee's DROP replacement is engine-owned.  Observe only the
+    -- native Royal Jelly or the configured mapped reward near her death, so
+    -- this diagnostic cannot confuse unrelated Jungle items with her check.
+    set_post_entity_spawn(function(entity)
+        local pending=ctx.pending_queen_bee_drop
+        if not pending or not entity or entity.layer~=pending.layer or math.abs(entity.x-pending.x)+math.abs(entity.y-pending.y)>12 then return end
+        local reward,mapped_type=placements.reward_type(ctx.randomizer_state,"CHECK_QUEEN_BEE")
+        local jelly_type=placements.type_of("ITEM_PICKUP_ROYALJELLY")
+        if entity.type.id~=jelly_type and entity.type.id~=mapped_type then return end
+        ctx.pending_queen_bee_drop=nil
+        local kind=entity.type.id==jelly_type and "native Royal Jelly" or "mapped reward "..tostring(reward)
+        ctx.log("Queen Bee reward observed: "..kind.." uid "..entity.uid.." (type "..entity.type.id..")")
+    end,SPAWN_TYPE.ANY,0,0)
     -- `replace_drop` swaps the engine's True Crown DROP directly, so there is
     -- no replacement callback to use.  Observe entity spawns only while a
     -- particular Beg reward is pending, then match the configured reward at

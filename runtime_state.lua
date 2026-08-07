@@ -4,7 +4,7 @@ local lifecycle=require "check_lifecycle"
 local M={}
 
 local LEVEL_TABLES={
-    "quillback_hooks", "beg_hooks", "anubis_hooks",
+    "quillback_hooks", "beg_hooks", "anubis_hooks", "queen_bee_hooks",
     "humphead_hooks", "yeti_hooks", "lahamu_hooks", "vlad_hooks", "tiamat_hooks", "eggplant_king_hooks",
     "moon_bows", "moon_hidden_bows",
     "sun_challenge_bags",
@@ -13,7 +13,7 @@ local LEVEL_TABLES={
 function M.new(randomizer_state, initialize, log, is_kali_item_recovery_enabled, is_balanced_duat_kali_rewards_enabled, is_true_crown_restoration_enabled)
     local ctx={
         randomizer_state=randomizer_state,
-        quillback_hooks={}, beg_hooks={}, anubis_hooks={},
+        quillback_hooks={}, beg_hooks={}, anubis_hooks={}, queen_bee_hooks={},
         humphead_hooks={}, yeti_hooks={}, lahamu_hooks={}, vlad_hooks={}, tiamat_hooks={}, eggplant_king_hooks={},
         pending_yeti_drops={}, spawn_replacements={}, moon_bows={}, moon_hidden_bows={}, sun_challenge_bags={},
         lahamu_diagnostic_logged=false,
@@ -51,6 +51,7 @@ function M.reset_level(ctx)
     ctx.pending_anubis_scepter_drop=nil
     ctx.pending_humphead_present=nil
     ctx.pending_tiamat_reward=nil
+    ctx.pending_queen_bee_drop=nil
     ctx.pending_true_crown_delivery=nil
     ctx.pending_kali_present_payload=nil
     ctx.spawn_replacements={}
@@ -75,6 +76,7 @@ function M.reset_run(ctx)
     ctx.kali_present_source_seen=false
     ctx.kali_present_source_location=nil
     ctx.pending_humphead_present=nil
+    ctx.pending_queen_bee_drop=nil
     ctx.pending_kali_present_payload=nil
     ctx.duat_recovery=nil
     ctx.duat_recovery_spawned=false
