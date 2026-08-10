@@ -44,6 +44,7 @@ if developer_options then
     register_option_string("o_dev_adventure_seed","Adventure Run Seed","Two signed integers from a run report, in the form first,second.",saved_option("o_dev_adventure_seed",""))
     register_option_bool("p_dev_in_game_logging","In-Game Logging","Show Key Item Randomizer runtime logs in the Playlunky overlay.",saved_option("p_dev_in_game_logging",build_config.default_overlay_runtime_logs==true))
     register_option_bool("q_dev_test_resources","Test: Start with resources and progression items","Give each player the test loadout used for check verification.",saved_option("q_dev_test_resources",true,"l_test_resources","k_test_resources","g_test_resources","f_test_resources","test_resources"))
+    register_option_int("r_dev_beg_start_state","Beg Starting Quest State","Developer only. Apply this state to Beg's quest at the start of every run. Use 0 for normal behavior; use 4 to prepare the True Crown completion transition.",saved_option("r_dev_beg_start_state",0),0,5)
 end
 options=_G.options or persisted_options or {}
 register_option_button("c_new_seed","New Seed","",function() options.d_seed=0 end)
@@ -55,10 +56,24 @@ local function parse_adventure_seed(value)
     local first,second=tostring(value or ""):match("^%s*([%-]?%d+)%s*,%s*([%-]?%d+)%s*$")
     return first and tonumber(first) or nil,second and tonumber(second) or nil
 end
+
+local runtime_context
+local function apply_developer_beg_start_state()
+    if not developer_options then return end
+    local quests=state.quests
+    if not quests then
+        log("Developer Beg Starting Quest State unavailable: quest state is not initialized")
+        return
+    end
+    local requested=math.max(0,math.min(5,math.floor(tonumber(options.r_dev_beg_start_state) or 0)))
+    quests.beg_state=requested
+    runtime_context.beg_last_state=requested
+    log("Developer Beg Starting Quest State applied: "..requested)
+end
 sync_developer_options()
 
 local randomizer_state={seed=0,mapping=nil,initialized=false,level_materialized={}}
-local runtime_context=nil
+runtime_context=nil
 local log=logger.log
 local function grant_test_item(player,entity_type,label)
     if not entity_type or entity_has_item_type(player.uid,entity_type) then return false end
@@ -176,6 +191,7 @@ set_callback(function()
     -- run only. ON.START is also used by shortcuts/debug starts, which may
     -- not begin in 1-1, so reset unconditionally here.
     runtime.reset_run(runtime_context)
+    apply_developer_beg_start_state()
     if not options.b_enabled then return end
     -- Release builds always retain a complete report so players can attach it
     -- when reporting an issue. The developer archive exposes the two controls
