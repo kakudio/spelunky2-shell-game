@@ -22,7 +22,6 @@ function M.new(randomizer_state, initialize, log, is_kali_item_recovery_enabled,
         kali_presents={}, kali_present_source_placed=false, kali_present_completed=false,
         kali_present_sacrifice_pending=false, kali_present_source_uid=nil, kali_present_source_seen=false, kali_present_source_location=nil,
         duat_recovery=nil, duat_recovery_spawned=false,
-        beg_true_crown_healed=false,
         beg_last_state=nil,
         duat_recovery_signature=nil, duat_recovery_empty_logged=false,
         duat_recovery_scan_signature=nil,
@@ -80,7 +79,6 @@ function M.reset_run(ctx)
     ctx.pending_kali_present_payload=nil
     ctx.duat_recovery=nil
     ctx.duat_recovery_spawned=false
-    ctx.beg_true_crown_healed=false
     ctx.beg_last_state=nil
     ctx.duat_recovery_signature=nil
     ctx.duat_recovery_empty_logged=false

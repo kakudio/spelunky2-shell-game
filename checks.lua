@@ -758,8 +758,7 @@ local function is_cursed(player)
 end
 
 local function restore_true_crown_players(ctx)
-    if (ctx.is_true_crown_restoration_enabled and not ctx.is_true_crown_restoration_enabled()) or ctx.beg_true_crown_healed then return end
-    ctx.beg_true_crown_healed=true
+    if ctx.is_true_crown_restoration_enabled and not ctx.is_true_crown_restoration_enabled() then return end
     local cured=0
     for _,player in ipairs(players or {}) do
         if is_cursed(player) then
