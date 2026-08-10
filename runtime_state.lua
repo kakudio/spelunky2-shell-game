@@ -23,7 +23,7 @@ function M.new(randomizer_state, initialize, log, is_kali_item_recovery_enabled,
         kali_present_sacrifice_pending=false, kali_present_source_uid=nil, kali_present_source_seen=false, kali_present_source_location=nil,
         duat_recovery=nil, duat_recovery_spawned=false,
         beg_true_crown_healed=false,
-        pending_true_crown_delivery=nil,
+        beg_last_state=nil,
         duat_recovery_signature=nil, duat_recovery_empty_logged=false,
         duat_recovery_scan_signature=nil,
         duat_recovery_seen_items={},
@@ -54,14 +54,12 @@ function M.reset_level(ctx)
     ctx.pending_humphead_present=nil
     ctx.pending_tiamat_reward=nil
     ctx.pending_queen_bee_drop=nil
-    ctx.pending_true_crown_delivery=nil
     ctx.pending_kali_present_payload=nil
     ctx.spawn_replacements={}
     ctx.moon_handoff_spawning=false
     ctx.lahamu_diagnostic_logged=false
     ctx.duat_recovery_spawned=false
     ctx.duat_recovery_scan_signature=nil
-    ctx.beg_true_crown_healed=false
 end
 
 function M.reset_run(ctx)
@@ -83,6 +81,7 @@ function M.reset_run(ctx)
     ctx.duat_recovery=nil
     ctx.duat_recovery_spawned=false
     ctx.beg_true_crown_healed=false
+    ctx.beg_last_state=nil
     ctx.duat_recovery_signature=nil
     ctx.duat_recovery_empty_logged=false
     ctx.duat_recovery_scan_signature=nil

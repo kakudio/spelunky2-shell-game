@@ -771,50 +771,32 @@ local function restore_true_crown_players(ctx)
     ctx.log("True Crown reward delivered: cured "..cured.." player(s) and restored each to at least 4 HP")
 end
 
-local function attach_true_crown_delivery(ctx)
-    local beg_type=placements.type_of("MONS_HUNDUNS_SERVANT")
-    for _,uid in ipairs(beg_type and get_entities_by_type(beg_type) or {}) do
-        local beg=get_entity(uid)
-        if beg and not ctx.beg_hooks[uid] then
-            ctx.beg_hooks[uid]=true
-            beg:set_pre_kill(function(self)
-                local quests=state.quests
-                local beg_state=quests and quests.beg_state or nil
-                if ctx.is_true_crown_restoration_enabled and not ctx.is_true_crown_restoration_enabled() then
-                    ctx.log("Beg uid "..self.uid.." pre-kill ignored: True Crown Restoration is disabled")
-                    return
-                end
-                if ctx.beg_true_crown_healed or not quests or (beg_state or 0)<4 then
-                    ctx.log("Beg uid "..self.uid.." pre-kill did not arm True Crown restoration; beg_state="..tostring(beg_state))
-                    return
-                end
-                -- Beg's death only identifies the short window in which the
-                -- native True Crown reward is emitted.  The recovery itself
-                -- is performed only after that actual reward has spawned.
-                local pending={x=self.x,y=self.y,layer=self.layer}
-                ctx.pending_true_crown_delivery=pending
-                ctx.log(string.format("Beg True Crown reward pending at %.1f, %.1f layer %s (beg_state=%s)",pending.x,pending.y,tostring(pending.layer),tostring(beg_state)))
-                -- Direct DROP substitutions can bypass post-spawn callbacks
-                -- in some Playlunky builds.  The quest state above proves
-                -- this is the True Crown event, so complete the optional
-                -- restoration after its native reward sequence if no direct
-                -- spawn observation arrived first.
-                ctx.defer(5,"True Crown delivery fallback",function()
-                    if ctx.pending_true_crown_delivery==pending then
-                        ctx.pending_true_crown_delivery=nil
-                        ctx.log("Beg True Crown reward was not observed directly; applying post-delivery restoration fallback")
-                        restore_true_crown_players(ctx)
-                    end
-                end)
-                ctx.defer(30,"True Crown delivery window",function()
-                    if ctx.pending_true_crown_delivery==pending then
-                        ctx.pending_true_crown_delivery=nil
-                        ctx.log("Beg True Crown reward was not observed before the delivery window expired")
-                    end
-                end)
-            end)
-            ctx.log("Attached True Crown delivery watcher to Beg uid "..uid)
-        end
+-- The native DROP replacement is reliable, whereas Beg's entity lifecycle is
+-- not: this quest NPC can deliver its reward without a Lua spawn or pre-kill
+-- callback. The quest state is authoritative and advances to 4 only when the
+-- True Crown reward sequence completes.
+local BEG_TRUE_CROWN_DELIVERED_STATE=4
+local function watch_beg_true_crown_quest(ctx)
+    local quests=state.quests
+    local current=quests and quests.beg_state
+    if current==nil then return end
+    local previous=ctx.beg_last_state
+    if previous==nil then
+        ctx.beg_last_state=current
+        ctx.log("Beg quest state initialized: "..tostring(current))
+        return
+    end
+    if previous==current then return end
+    ctx.beg_last_state=current
+    ctx.log(string.format("Beg quest state changed: %s -> %s at %d-%d (theme %s)",tostring(previous),tostring(current),state.world,state.level,tostring(state.theme)))
+    if previous<BEG_TRUE_CROWN_DELIVERED_STATE and current>=BEG_TRUE_CROWN_DELIVERED_STATE then
+        -- The state changes as the native delivery sequence completes. Give
+        -- that sequence two frames to apply curse effects before curing every
+        -- currently cursed player.
+        ctx.defer(2,"True Crown quest-state restoration",function()
+            ctx.log("Beg True Crown quest completion detected; restoring cursed players")
+            restore_true_crown_players(ctx)
+        end)
     end
 end
 
@@ -850,17 +832,6 @@ local function observe_pending_quest_reward(ctx,entity)
             ctx.pending_queen_bee_drop=nil
             local kind=entity.type.id==jelly_type and "native Royal Jelly" or "mapped reward "..tostring(reward)
             ctx.log("Queen Bee reward observed: "..kind.." uid "..entity.uid.." (type "..entity.type.id..")")
-        end
-    end
-    local crown_pending=ctx.pending_true_crown_delivery
-    if crown_pending and entity and entity.layer==crown_pending.layer and math.abs(entity.x-crown_pending.x)+math.abs(entity.y-crown_pending.y)<=12 then
-        local _,mapped_type=placements.reward_type(ctx.randomizer_state,"CHECK_BEG_TRUE_CROWN")
-        local native_type=placements.type_of("ITEM_PICKUP_TRUECROWN")
-        if entity.type.id==mapped_type or entity.type.id==native_type then
-            ctx.pending_true_crown_delivery=nil
-            ctx.log("Beg True Crown reward observed as uid "..entity.uid.."; scheduling restoration")
-            -- Let the native encounter finish applying its curse before curing it.
-            ctx.defer(2,"True Crown reward restoration",function() restore_true_crown_players(ctx) end)
         end
     end
 end
@@ -1024,7 +995,6 @@ end
 
 function M.on_balance_post_level_generation(ctx)
     duat.on_post_level_generation(ctx)
-    attach_true_crown_delivery(ctx)
 end
 
 function M.register_spawn_hooks(ctx)
@@ -1054,15 +1024,9 @@ function M.register_spawn_hooks(ctx)
             end,SPAWN_TYPE.ANY,0,entity_type)
         end
     end
-    -- Beg can be created after level generation.  Attach the delivery watcher
-    -- at spawn as well, so the True Crown reward is observed even in that
-    -- delayed case.
-    local beg_type=placements.type_of("MONS_HUNDUNS_SERVANT")
-    if beg_type then
-        set_post_entity_spawn(function()
-            attach_true_crown_delivery(ctx)
-        end,SPAWN_TYPE.ANY,0,beg_type)
-    end
+    -- `DROP.BEG_TRUECROWN` is configured directly in the engine. Watch the
+    -- quest-state transition instead of Beg's unreliable entity lifecycle.
+    set_callback(function() watch_beg_true_crown_quest(ctx) end,ON.FRAME)
     local queen_type=placements.type_of("MONS_QUEENBEE")
     if queen_type then
         set_post_entity_spawn(function(entity)
