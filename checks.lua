@@ -772,9 +772,9 @@ end
 
 -- The native DROP replacement is reliable, whereas Beg's entity lifecycle is
 -- not: this quest NPC can deliver its reward without a Lua spawn or pre-kill
--- callback. The quest state is authoritative and advances to 4 only when the
--- True Crown reward sequence completes.
-local BEG_TRUE_CROWN_DELIVERED_STATE=4
+-- callback. State 4 is the pre-delivery True Crown encounter; its 4 -> 5
+-- transition is authoritative confirmation that the reward sequence ended.
+local BEG_TRUE_CROWN_DELIVERED_STATE=5
 local function watch_beg_true_crown_quest(ctx)
     local quests=state.quests
     local current=quests and quests.beg_state
@@ -788,7 +788,7 @@ local function watch_beg_true_crown_quest(ctx)
     if previous==current then return end
     ctx.beg_last_state=current
     ctx.log(string.format("Beg quest state changed: %s -> %s at %d-%d (theme %s)",tostring(previous),tostring(current),state.world,state.level,tostring(state.theme)))
-    if previous<BEG_TRUE_CROWN_DELIVERED_STATE and current>=BEG_TRUE_CROWN_DELIVERED_STATE then
+    if previous==BEG_TRUE_CROWN_DELIVERED_STATE-1 and current==BEG_TRUE_CROWN_DELIVERED_STATE then
         -- The state changes as the native delivery sequence completes. Give
         -- that sequence two frames to apply curse effects before curing every
         -- currently cursed player.
