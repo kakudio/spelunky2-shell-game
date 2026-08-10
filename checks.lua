@@ -799,6 +799,14 @@ local function watch_beg_true_crown_quest(ctx)
     end
 end
 
+local function reset_beg_intermediate_state(ctx)
+    local quests=state.quests
+    if not quests or quests.beg_state~=2 then return end
+    quests.beg_state=1
+    ctx.beg_last_state=1
+    ctx.log("Beg quest state reset: 2 -> 1 at level transition")
+end
+
 local function attach_queen_bee_diagnostics(ctx)
     local queen_type=placements.type_of("MONS_QUEENBEE")
     for _,uid in ipairs(queen_type and get_entities_by_type(queen_type) or {}) do
@@ -1026,6 +1034,7 @@ function M.register_spawn_hooks(ctx)
     -- `DROP.BEG_TRUECROWN` is configured directly in the engine. Watch the
     -- quest-state transition instead of Beg's unreliable entity lifecycle.
     set_callback(function() watch_beg_true_crown_quest(ctx) end,ON.FRAME)
+    set_callback(function() reset_beg_intermediate_state(ctx) end,ON.TRANSITION)
     local queen_type=placements.type_of("MONS_QUEENBEE")
     if queen_type then
         set_post_entity_spawn(function(entity)
