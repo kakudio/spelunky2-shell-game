@@ -58,6 +58,7 @@ local function parse_adventure_seed(value)
 end
 
 local runtime_context
+local log=logger.log
 local function apply_developer_beg_start_state()
     if not developer_options then return end
     local quests=state.quests
@@ -74,7 +75,6 @@ sync_developer_options()
 
 local randomizer_state={seed=0,mapping=nil,initialized=false,level_materialized={}}
 runtime_context=nil
-local log=logger.log
 local function grant_test_item(player,entity_type,label)
     if not entity_type or entity_has_item_type(player.uid,entity_type) then return false end
     local uid=spawn_entity_nonreplaceable(entity_type,player.x,player.y,player.layer,0,0)
