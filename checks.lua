@@ -570,6 +570,30 @@ local function yang_door_status(door, player)
     return unlocked,can_enter
 end
 
+local function yang_raw_door_lock_details(door)
+    local unlocked_ok,unlocked=pcall(function() return door.unlocked end)
+    local counter_ok,counter=pcall(function() return door.counter end)
+    local overlay_ok,overlay=pcall(function() return door.overlay end)
+    local details={
+        "raw_unlocked="..(unlocked_ok and tostring(unlocked) or "unavailable"),
+        "counter="..(counter_ok and tostring(counter) or "unavailable"),
+        "overlay="..(overlay_ok and tostring(overlay) or "unavailable"),
+    }
+    local grid_ok,grid_uids=pcall(get_entities_overlapping_grid,door.x,door.y,door.layer)
+    if not grid_ok then
+        table.insert(details,"grid=unavailable")
+        return table.concat(details," ")
+    end
+    local grid_entities={}
+    for _,uid in ipairs(grid_uids) do
+        local entity=get_entity(uid)
+        local name=entity and entity.type and get_entity_name(entity.type.id,true) or "missing"
+        table.insert(grid_entities,string.format("%s(uid %d)",name,uid))
+    end
+    table.insert(details,"grid=["..table.concat(grid_entities,", ").."]")
+    return table.concat(details," ")
+end
+
 local function log_yang_door_status(ctx, label, entries)
     local player=players and players[1]
     for _,entry in ipairs(entries) do
@@ -578,7 +602,8 @@ local function log_yang_door_status(ctx, label, entries)
             local unlocked,can_enter=yang_door_status(door,player)
             local lock_text=unlocked==nil and "unlocked=unavailable" or "unlocked="..tostring(unlocked)
             local enter_text=can_enter==nil and "can_enter=unavailable" or "can_enter="..tostring(can_enter)
-            ctx.log(string.format("Yang door %s %s uid %d at %.1f, %.1f layer %s %s %s",label,entry.name,entry.uid,door.x,door.y,tostring(door.layer),lock_text,enter_text))
+            local raw_details=yang_raw_door_lock_details(door)
+            ctx.log(string.format("Yang door %s %s uid %d at %.1f, %.1f layer %s %s %s %s",label,entry.name,entry.uid,door.x,door.y,tostring(door.layer),lock_text,enter_text,raw_details))
         else
             ctx.log("Yang door "..label.." "..entry.name.." uid "..entry.uid.." no longer exists")
         end
