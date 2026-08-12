@@ -585,6 +585,33 @@ local function log_yang_door_status(ctx, label, entries)
     end
 end
 
+local function room_index_text(x,y)
+    local ok,room_x,room_y=pcall(get_room_index,x,y)
+    return ok and string.format("%s,%s",tostring(room_x),tostring(room_y)) or "unavailable"
+end
+
+local function log_yang_room_ownership(ctx, entries)
+    local owned_rooms=state.room_owners and state.room_owners.owned_rooms
+    if not owned_rooms then
+        ctx.log("Yang room ownership diagnostic unavailable: state.room_owners.owned_rooms is missing")
+        return
+    end
+    ctx.log("Yang room ownership diagnostic: "..tostring(#owned_rooms).." owned room(s)")
+    for index,room in ipairs(owned_rooms) do
+        local owner=room.owner_uid and get_entity(room.owner_uid) or nil
+        local owner_name=owner and owner.type and get_entity_name(owner.type.id,true) or "missing owner"
+        ctx.log(string.format("Yang owned-room entry %d: owner uid %s (%s), room_index=%s, layer=%s",index,tostring(room.owner_uid),tostring(owner_name),tostring(room.room_index),tostring(room.layer)))
+    end
+    for _,entry in ipairs(entries) do
+        local door=get_entity(entry.uid)
+        if door then
+            local x,y=door.x,door.y
+            ctx.log(string.format("Yang door room neighbors %s uid %d at %.1f, %.1f: left=%s right=%s below=%s above=%s",entry.name,entry.uid,x,y,
+                room_index_text(x-0.6,y),room_index_text(x+0.6,y),room_index_text(x,y-0.6),room_index_text(x,y+0.6)))
+        end
+    end
+end
+
 local function yang_position(ctx, yang)
     local best,best_name,best_distance,best_priority=nil,nil,math.huge,math.huge
     local diagnostics={}
@@ -633,6 +660,7 @@ local function yang_position(ctx, yang)
                 log_yang_door_status(ctx,"after "..delay.." frame(s)",diagnostics)
             end)
         end
+        ctx.defer(1,"Yang room ownership diagnostic",function() log_yang_room_ownership(ctx,diagnostics) end)
     end
     if best then
         local direction=best.x>=yang.x and 1 or -1
