@@ -594,7 +594,7 @@ local function yang_position(ctx, yang)
             end
         end
     end
-    if best and best_distance<=12 then
+    if best then
         local direction=best.x>=yang.x and 1 or -1
         ctx.log(string.format("Yang reward anchor uses %s at %.1f, %.1f (priority %d)",best_name,best.x,best.y,best_priority))
         return best.x+direction,best.y,LAYER.BACK
