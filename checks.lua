@@ -613,9 +613,10 @@ local function log_yang_room_ownership(ctx, entries)
 end
 
 local function yang_position(ctx, yang)
-    local best,best_name,best_distance,best_priority=nil,nil,math.huge,math.huge
+    local best,best_name,best_distance=nil,nil,math.huge
     local diagnostics={}
-    ctx.log(string.format("Yang is at %.1f, %.1f layer %s; scanning candidate doors",yang.x,yang.y,tostring(yang.layer)))
+    local treasure_door_y=yang.y-5
+    ctx.log(string.format("Yang is at %.1f, %.1f layer %s; scanning candidate doors on row %.1f",yang.x,yang.y,tostring(yang.layer),treasure_door_y))
     for _,name in ipairs(YANG_DOOR_TYPES) do
         local kind=placements.type_of(name)
         if kind then
@@ -632,22 +633,11 @@ local function yang_position(ctx, yang)
                     local enter_text=can_enter==nil and "can_enter=unavailable" or "can_enter="..tostring(can_enter)
                     ctx.log(string.format("Yang door candidate %s uid %d at %.1f, %.1f layer %s distance %.1f %s %s",name,uid,door.x,door.y,tostring(door.layer),distance,lock_text,enter_text))
                     table.insert(diagnostics,{uid=uid,name=name})
-                    -- Yang's treasure-room door is always below him (smaller
-                    -- world Y). `FLOOR_DOOR_ENTRANCE` can sit just as close,
-                    -- but is above him. Prefer a lower actual background
-                    -- door, then another lower back-layer door; all others
-                    -- are fallback-only if a generated layout is unusual.
-                    local below_yang=door.y<yang.y
-                    -- The treasure door begins locked. A confirmed locked
-                    -- door wins before all spatial tie-breakers.
-                    -- Layer doors report themselves as unlocked even when
-                    -- quest logic blocks them. Only the explicit locked-door
-                    -- entity is a reliable lock signal for selection.
-                    local lock_priority=name=="FLOOR_DOOR_LOCKED" and 0 or 10
-                    local door_priority=below_yang and name=="BG_DOOR_BACK_LAYER" and 1 or below_yang and door.layer==LAYER.BACK and 2 or 3
-                    local priority=lock_priority+door_priority
-                    if priority<best_priority or (priority==best_priority and distance<best_distance) then
-                        best,best_name,best_distance,best_priority=door,name,distance,priority
+                    -- Across every recorded Yang layout, his treasure door
+                    -- is exactly five tiles below him. Restrict selection to
+                    -- that row; other locks and nearby doors are unrelated.
+                    if math.abs(door.y-treasure_door_y)<0.01 and math.abs(door.x-yang.x)<best_distance then
+                        best,best_name,best_distance=door,name,math.abs(door.x-yang.x)
                     end
                 end
             end
@@ -664,10 +654,10 @@ local function yang_position(ctx, yang)
     end
     if best then
         local direction=best.x>=yang.x and 1 or -1
-        ctx.log(string.format("Yang reward anchor uses %s at %.1f, %.1f (priority %d)",best_name,best.x,best.y,best_priority))
+        ctx.log(string.format("Yang reward anchor uses closest row-5 %s at %.1f, %.1f (horizontal distance %.1f)",best_name,best.x,best.y,best_distance))
         return best.x+direction,best.y,LAYER.BACK
     end
-    ctx.log("Yang reward anchor did not find a nearby back-layer door; using fallback coordinate")
+    ctx.log("Yang reward anchor found no door on Yang's row minus five; using fallback coordinate")
     return yang.x-1,yang.y,LAYER.BACK
 end
 
