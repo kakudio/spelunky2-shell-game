@@ -215,7 +215,12 @@ set_callback(function()
     -- not begin in 1-1, so reset unconditionally here.
     runtime.reset_run(runtime_context)
     apply_developer_beg_start_state()
-    if developer_options and game_seed then persist_adventure_seed(game_seed()) end
+    if developer_options and game_seed then
+        -- game_seed returns a pair. Passing it directly to the one-argument
+        -- persistence helper silently drops the second half in Lua.
+        local first,second=game_seed()
+        persist_adventure_seed(tostring(first)..","..tostring(second))
+    end
     if not options.b_enabled then return end
     -- Release builds always retain a complete report so players can attach it
     -- when reporting an issue. The developer archive exposes the two controls
