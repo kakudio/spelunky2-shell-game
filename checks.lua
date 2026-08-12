@@ -3,6 +3,7 @@
 local placements=require "placements"
 local adapters=require "adapters"
 local logic=require "logic"
+local build_config=require "build_config"
 local sparrow=require "sparrow_adapter"
 local duat=require "duat_adapter"
 local M={}
@@ -559,8 +560,34 @@ local function replace_first_kali_gift(ctx,existing_items,attempt,replacement_ui
         ctx.log("Kali first-gift check found no generated reward item near altar; new nearby items: "..(#observed>0 and table.concat(observed,"; ") or "none"))
     end
 end
+local function yang_door_status(door, player)
+    local unlocked,can_enter=nil,nil
+    local unlocked_ok,unlocked_value=pcall(function() return door:is_unlocked() end)
+    if unlocked_ok and type(unlocked_value)=="boolean" then unlocked=unlocked_value end
+    local enter_ok,enter_value=false,nil
+    if player then enter_ok,enter_value=pcall(function() return door:can_enter(player) end) end
+    if enter_ok and type(enter_value)=="boolean" then can_enter=enter_value end
+    return unlocked,can_enter
+end
+
+local function log_yang_door_status(ctx, label, entries)
+    local player=players and players[1]
+    for _,entry in ipairs(entries) do
+        local door=get_entity(entry.uid)
+        if door then
+            local unlocked,can_enter=yang_door_status(door,player)
+            local lock_text=unlocked==nil and "unlocked=unavailable" or "unlocked="..tostring(unlocked)
+            local enter_text=can_enter==nil and "can_enter=unavailable" or "can_enter="..tostring(can_enter)
+            ctx.log(string.format("Yang door %s %s uid %d at %.1f, %.1f layer %s %s %s",label,entry.name,entry.uid,door.x,door.y,tostring(door.layer),lock_text,enter_text))
+        else
+            ctx.log("Yang door "..label.." "..entry.name.." uid "..entry.uid.." no longer exists")
+        end
+    end
+end
+
 local function yang_position(ctx, yang)
     local best,best_name,best_distance,best_priority=nil,nil,math.huge,math.huge
+    local diagnostics={}
     ctx.log(string.format("Yang is at %.1f, %.1f layer %s; scanning candidate doors",yang.x,yang.y,tostring(yang.layer)))
     for _,name in ipairs(YANG_DOOR_TYPES) do
         local kind=placements.type_of(name)
@@ -572,16 +599,12 @@ local function yang_position(ctx, yang)
                     -- `unlocked` is not a documented entity field. Probe the
                     -- Door virtual methods instead; `can_enter` exposes the
                     -- quest-specific behavior that a generic lock check misses.
-                    local unlocked,can_enter=nil,nil
-                    local unlocked_ok,unlocked_value=pcall(function() return door:is_unlocked() end)
-                    if unlocked_ok and type(unlocked_value)=="boolean" then unlocked=unlocked_value end
                     local player=players and players[1]
-                    local enter_ok,enter_value=false,nil
-                    if player then enter_ok,enter_value=pcall(function() return door:can_enter(player) end) end
-                    if enter_ok and type(enter_value)=="boolean" then can_enter=enter_value end
+                    local unlocked,can_enter=yang_door_status(door,player)
                     local lock_text=unlocked==nil and "unlocked=unavailable" or "unlocked="..tostring(unlocked)
                     local enter_text=can_enter==nil and "can_enter=unavailable" or "can_enter="..tostring(can_enter)
                     ctx.log(string.format("Yang door candidate %s uid %d at %.1f, %.1f layer %s distance %.1f %s %s",name,uid,door.x,door.y,tostring(door.layer),distance,lock_text,enter_text))
+                    table.insert(diagnostics,{uid=uid,name=name})
                     -- Yang's treasure-room door is always below him (smaller
                     -- world Y). `FLOOR_DOOR_ENTRANCE` can sit just as close,
                     -- but is above him. Prefer a lower actual background
@@ -590,7 +613,10 @@ local function yang_position(ctx, yang)
                     local below_yang=door.y<yang.y
                     -- The treasure door begins locked. A confirmed locked
                     -- door wins before all spatial tie-breakers.
-                    local lock_priority=unlocked==false and 0 or 10
+                    -- Layer doors report themselves as unlocked even when
+                    -- quest logic blocks them. Only the explicit locked-door
+                    -- entity is a reliable lock signal for selection.
+                    local lock_priority=name=="FLOOR_DOOR_LOCKED" and 0 or 10
                     local door_priority=below_yang and name=="BG_DOOR_BACK_LAYER" and 1 or below_yang and door.layer==LAYER.BACK and 2 or 3
                     local priority=lock_priority+door_priority
                     if priority<best_priority or (priority==best_priority and distance<best_distance) then
@@ -598,6 +624,14 @@ local function yang_position(ctx, yang)
                     end
                 end
             end
+        end
+    end
+    if build_config.developer_options and #diagnostics>0 then
+        for _,frames in ipairs({1,10,60}) do
+            local delay=frames
+            ctx.defer(delay,"Yang door late-state diagnostic",function()
+                log_yang_door_status(ctx,"after "..delay.." frame(s)",diagnostics)
+            end)
         end
     end
     if best then
