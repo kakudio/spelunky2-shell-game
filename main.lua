@@ -122,10 +122,33 @@ local function persist_seed(seed)
     local file=io.open_data("randomizer_seed.txt","w")
     if file then file:write(tostring(seed)); file:close() end
 end
+
+local function load_persisted_adventure_seed()
+    if not developer_options then return nil end
+    local file=io.open_data("adventure_run_seed.txt","r")
+    if not file then return nil end
+    local value=file:read("a"); file:close()
+    local first,second=parse_adventure_seed(value)
+    return first and (tostring(first)..","..tostring(second)) or nil
+end
+
+local function persist_adventure_seed(value)
+    if not developer_options then return end
+    local first,second=parse_adventure_seed(value)
+    if not first then return end
+    local seed=tostring(first)..","..tostring(second)
+    local file=io.open_data("adventure_run_seed.txt","w")
+    if file then file:write(seed); file:close() end
+    options.o_dev_adventure_seed=seed
+    log("Developer Adventure Run Seed saved: "..seed)
+end
+
 -- The options menu is the seed selector. On opening the mod it shows the
 -- saved layout seed; choosing 0 explicitly requests a new one at run start.
 local saved_seed_for_menu=load_persisted_seed()
 if saved_seed_for_menu then options.d_seed=saved_seed_for_menu end
+local saved_adventure_seed_for_menu=load_persisted_adventure_seed()
+if saved_adventure_seed_for_menu then options.o_dev_adventure_seed=saved_adventure_seed_for_menu end
 local function initialize()
     if randomizer_state.initialized then return end
     randomizer_state.seed=tonumber(options.d_seed) or 0
@@ -192,6 +215,7 @@ set_callback(function()
     -- not begin in 1-1, so reset unconditionally here.
     runtime.reset_run(runtime_context)
     apply_developer_beg_start_state()
+    if developer_options and game_seed then persist_adventure_seed(game_seed()) end
     if not options.b_enabled then return end
     -- Release builds always retain a complete report so players can attach it
     -- when reporting an issue. The developer archive exposes the two controls
