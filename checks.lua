@@ -649,6 +649,7 @@ local function yang_position(ctx, yang)
                 local door=get_entity(uid)
                 if door then
                     local distance=math.abs(door.x-yang.x)+math.abs(door.y-yang.y)
+                    local row_offset=math.abs(door.y-treasure_door_y)
                     -- `unlocked` is not a documented entity field. Probe the
                     -- Door virtual methods instead; `can_enter` exposes the
                     -- quest-specific behavior that a generic lock check misses.
@@ -656,12 +657,12 @@ local function yang_position(ctx, yang)
                     local unlocked,can_enter=yang_door_status(door,player)
                     local lock_text=unlocked==nil and "unlocked=unavailable" or "unlocked="..tostring(unlocked)
                     local enter_text=can_enter==nil and "can_enter=unavailable" or "can_enter="..tostring(can_enter)
-                    ctx.log(string.format("Yang door candidate %s uid %d at %.1f, %.1f layer %s distance %.1f %s %s",name,uid,door.x,door.y,tostring(door.layer),distance,lock_text,enter_text))
+                    ctx.log(string.format("Yang door candidate %s uid %d at %.1f, %.1f layer %s distance %.1f row offset %.3f %s %s",name,uid,door.x,door.y,tostring(door.layer),distance,row_offset,lock_text,enter_text))
                     table.insert(diagnostics,{uid=uid,name=name})
                     -- Across every recorded Yang layout, his treasure door
                     -- is exactly five tiles below him. Restrict selection to
                     -- that row; other locks and nearby doors are unrelated.
-                    if math.abs(door.y-treasure_door_y)<0.01 and math.abs(door.x-yang.x)<best_distance then
+                    if row_offset<=0.5 and math.abs(door.x-yang.x)<best_distance then
                         best,best_name,best_distance=door,name,math.abs(door.x-yang.x)
                     end
                 end

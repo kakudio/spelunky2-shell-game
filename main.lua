@@ -215,11 +215,13 @@ set_callback(function()
     -- not begin in 1-1, so reset unconditionally here.
     runtime.reset_run(runtime_context)
     apply_developer_beg_start_state()
-    if developer_options and game_seed then
-        -- game_seed returns a pair. Passing it directly to the one-argument
-        -- persistence helper silently drops the second half in Lua.
-        local first,second=game_seed()
-        persist_adventure_seed(tostring(first)..","..tostring(second))
+    if developer_options and get_adventure_seed then
+        local ok,first,second=pcall(get_adventure_seed,true)
+        if ok and first~=nil and second~=nil then
+            persist_adventure_seed(tostring(first)..","..tostring(second))
+        else
+            log("Developer Adventure Run Seed could not be read at run start")
+        end
     end
     if not options.b_enabled then return end
     -- Release builds always retain a complete report so players can attach it
