@@ -33,7 +33,7 @@ register_option_int("d_seed","Randomizer Seed (0 = new logic)","",saved_option("
 register_group("e_balance_group","Balance")
 register_option_bool("f_kali_item_recovery","Kali Item Recovery","Restore held, equipped, and allowed altar-dropped items from the City of Gold to Duat.",saved_option("f_kali_item_recovery",true,"f_duat_item_recovery","d_duat_item_recovery","duat_item_recovery"))
 register_option_bool("g_balanced_duat_kali_rewards","Balanced Duat Kali Rewards","Replace the special Duat altar's favor rewards with balanced Player Bag and Royal Jelly rewards.",saved_option("g_balanced_duat_kali_rewards",true,"f_duat_item_recovery","d_duat_item_recovery","duat_item_recovery"))
-register_option_bool("h_true_crown_restoration","True Crown Restoration","Remove Beg's curse and restore the player to at least 4 HP after the True Crown encounter.",saved_option("h_true_crown_restoration",true))
+register_option_bool("h_true_crown_restoration","True Crown Restoration","Remove Kali's curse and restore the player to at least 4 HP after the True Crown encounter.",saved_option("h_true_crown_restoration",true))
 local developer_options=build_config.developer_options==true
 if developer_options then
     register_group("i_logging_group","Logging")

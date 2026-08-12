@@ -85,7 +85,7 @@ Access options via Modlunky 2's options menu or Overlunky (F8) → Options:
 | **New Seed** | Sets the seed to `0`, causing the next run to generate a new layout |
 | **Kali Item Recovery** | Restores held and allowed altar-dropped items from City of Gold to Duat |
 | **Balanced Duat Kali Rewards** | Replaces Duat altar favor rewards with cumulative Player Bag and Royal Jelly rewards |
-| **True Crown Restoration** | Removes Beg's curse and restores the player to at least 4 HP after the True Crown encounter |
+| **True Crown Restoration** | Removes Kali's curse and restores the player to at least 4 HP after the True Crown encounter |
 | **Generate Spoiler** | Includes the spoiler mapping in the per-run report |
 | **Generate Logs** | Includes mod logs in the same per-run report |
 | **Test Resources** | Grants a debug loadout for adapter verification |
