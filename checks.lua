@@ -569,13 +569,19 @@ local function yang_position(ctx, yang)
                 local door=get_entity(uid)
                 if door then
                     local distance=math.abs(door.x-yang.x)+math.abs(door.y-yang.y)
-                    -- Door subclasses differ; query the lock flag defensively
-                    -- so ordinary background doors remain valid candidates.
-                    local lock_flag=nil
-                    local ok,value=pcall(function() return door.unlocked end)
-                    if ok and type(value)=="boolean" then lock_flag=not value end
-                    local lock_text=lock_flag==nil and "unknown" or lock_flag and "locked" or "unlocked"
-                    ctx.log(string.format("Yang door candidate %s uid %d at %.1f, %.1f layer %s distance %.1f %s",name,uid,door.x,door.y,tostring(door.layer),distance,lock_text))
+                    -- `unlocked` is not a documented entity field. Probe the
+                    -- Door virtual methods instead; `can_enter` exposes the
+                    -- quest-specific behavior that a generic lock check misses.
+                    local unlocked,can_enter=nil,nil
+                    local unlocked_ok,unlocked_value=pcall(function() return door:is_unlocked() end)
+                    if unlocked_ok and type(unlocked_value)=="boolean" then unlocked=unlocked_value end
+                    local player=players and players[1]
+                    local enter_ok,enter_value=false,nil
+                    if player then enter_ok,enter_value=pcall(function() return door:can_enter(player) end) end
+                    if enter_ok and type(enter_value)=="boolean" then can_enter=enter_value end
+                    local lock_text=unlocked==nil and "unlocked=unavailable" or "unlocked="..tostring(unlocked)
+                    local enter_text=can_enter==nil and "can_enter=unavailable" or "can_enter="..tostring(can_enter)
+                    ctx.log(string.format("Yang door candidate %s uid %d at %.1f, %.1f layer %s distance %.1f %s %s",name,uid,door.x,door.y,tostring(door.layer),distance,lock_text,enter_text))
                     -- Yang's treasure-room door is always below him (smaller
                     -- world Y). `FLOOR_DOOR_ENTRANCE` can sit just as close,
                     -- but is above him. Prefer a lower actual background
@@ -584,7 +590,7 @@ local function yang_position(ctx, yang)
                     local below_yang=door.y<yang.y
                     -- The treasure door begins locked. A confirmed locked
                     -- door wins before all spatial tie-breakers.
-                    local lock_priority=lock_flag and 0 or 10
+                    local lock_priority=unlocked==false and 0 or 10
                     local door_priority=below_yang and name=="BG_DOOR_BACK_LAYER" and 1 or below_yang and door.layer==LAYER.BACK and 2 or 3
                     local priority=lock_priority+door_priority
                     if priority<best_priority or (priority==best_priority and distance<best_distance) then
