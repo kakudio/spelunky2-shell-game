@@ -44,7 +44,7 @@ if developer_options then
     register_option_string("o_dev_adventure_seed","Adventure Run Seed","Two signed integers from a run report, in the form first,second.",saved_option("o_dev_adventure_seed",""))
     register_option_bool("p_dev_in_game_logging","In-Game Logging","Show Key Item Randomizer runtime logs in the Playlunky overlay.",saved_option("p_dev_in_game_logging",build_config.default_overlay_runtime_logs==true))
     register_option_bool("q_dev_test_resources","Test: Start with resources and progression items","Give each player the test loadout used for check verification.",saved_option("q_dev_test_resources",true,"l_test_resources","k_test_resources","g_test_resources","f_test_resources","test_resources"))
-    register_option_int("r_dev_beg_start_state","Beg Starting Quest State","Developer only. Apply this state to Beg's quest at the start of every run. Use 0 for normal behavior; use 4 to prepare the True Crown completion transition.",saved_option("r_dev_beg_start_state",0),0,5)
+    register_option_int("r_dev_beg_start_state","Beg Starting Quest State","Developer only. Apply this state to Beg's quest at the start of every run. Use 0 for normal behavior; use 3 to prepare the True Crown completion transition.",saved_option("r_dev_beg_start_state",0),0,5)
 end
 options=_G.options or persisted_options or {}
 register_option_button("c_new_seed","New Seed","",function() options.d_seed=0 end)
