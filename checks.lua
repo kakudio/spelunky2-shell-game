@@ -61,7 +61,7 @@ local DROP_CONFIGS={
     {drop=DROP.BEG_TRUECROWN,check="CHECK_BEG_TRUE_CROWN",label="Beg True Crown"},
     {drop=DROP.ALTAR_KAPALA,check="CHECK_KALI_ALTAR_2",label="Kali Kapala"},
 }
-local YANG_DOOR_TYPES={"BG_DOOR_BACK_LAYER","FLOOR_DOOR_ENTRANCE","FLOOR_DOOR_EXIT","FLOOR_DOOR_LAYER","FLOOR_DOOR_LOCKED"}
+local YANG_DOOR_TYPES={"BG_DOOR_BACK_LAYER","FLOOR_DOOR_LAYER","FLOOR_DOOR_LOCKED"}
 
 local function players_have_any(named_types)
     if not named_types or #named_types==0 then return true end
