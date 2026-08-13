@@ -594,6 +594,32 @@ local function yang_raw_door_lock_details(door)
     return table.concat(details," ")
 end
 
+local function yang_nearby_door_entities(door)
+    -- Static grid inspection cannot reveal a movable, invisible, or FX entity
+    -- that the native door code might use as its lock. Query both layers with
+    -- the normal entity search as well.
+    local ok,uids=pcall(get_entities_at,0,MASK.ANY,door.x,door.y,LAYER.BOTH,0.75)
+    if not ok then return "nearby=unavailable" end
+    local nearby={}
+    for _,uid in ipairs(uids) do
+        local entity=get_entity(uid)
+        if entity then
+            local name=entity.type and get_entity_name(entity.type.id,true) or "unknown"
+            local x,y,layer=door.x,door.y,entity.layer
+            local position_ok,position_x,position_y,position_layer=pcall(get_position,uid)
+            if position_ok then x,y,layer=position_x,position_y,position_layer end
+            local overlay_ok,overlay=pcall(function() return entity.overlay end)
+            local items_ok,items=pcall(function() return entity:get_items() end)
+            local children={}
+            if items_ok and items then for _,child_uid in ipairs(items) do table.insert(children,tostring(child_uid)) end end
+            table.insert(nearby,string.format("%s(type %s uid %d at %.2f,%.2f layer %s overlay %s children [%s])",
+                name,tostring(entity.type and entity.type.id),uid,x,y,tostring(layer),
+                overlay_ok and tostring(overlay) or "unavailable",table.concat(children,",")))
+        end
+    end
+    return "nearby=["..table.concat(nearby,"; ").."]"
+end
+
 local function log_yang_door_status(ctx, label, entries)
     local player=players and players[1]
     for _,entry in ipairs(entries) do
@@ -603,7 +629,8 @@ local function log_yang_door_status(ctx, label, entries)
             local lock_text=unlocked==nil and "unlocked=unavailable" or "unlocked="..tostring(unlocked)
             local enter_text=can_enter==nil and "can_enter=unavailable" or "can_enter="..tostring(can_enter)
             local raw_details=yang_raw_door_lock_details(door)
-            ctx.log(string.format("Yang door %s %s uid %d at %.1f, %.1f layer %s %s %s %s",label,entry.name,entry.uid,door.x,door.y,tostring(door.layer),lock_text,enter_text,raw_details))
+            local nearby_entities=yang_nearby_door_entities(door)
+            ctx.log(string.format("Yang door %s %s uid %d at %.1f, %.1f layer %s %s %s %s %s",label,entry.name,entry.uid,door.x,door.y,tostring(door.layer),lock_text,enter_text,raw_details,nearby_entities))
         else
             ctx.log("Yang door "..label.." "..entry.name.." uid "..entry.uid.." no longer exists")
         end
