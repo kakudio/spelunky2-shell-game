@@ -316,11 +316,6 @@ local function scan_kali_present_eggplants(ctx, pending, attempt)
                     local replacement_uid=materialize(ctx,"CHECK_KALI_PRESENT",eggplant.x,eggplant.y,eggplant.layer,uid,false,false)
                     if replacement_uid then
                         ctx.kali_present_completed=true
-                        -- The Present is a Kali sacrifice and advances the
-                        -- native counter once. Account for that increase
-                        -- separately so a later ordinary favor still awards
-                        -- the first Kali altar check.
-                        ctx.kali_present_gift_pending=true
                         ctx.log("Kali Present Eggplant uid "..uid.." replaced in place with mapped reward uid "..replacement_uid)
                     end
                     break
@@ -1309,10 +1304,11 @@ function M.register_spawn_hooks(ctx)
         end
         if gifts>ctx.kali_last_gifts then
             ctx.log(string.format("Kali gift counter changed: %s -> %s (Present pending=%s completed=%s)",tostring(ctx.kali_last_gifts),tostring(gifts),tostring(ctx.kali_present_sacrifice_pending),tostring(ctx.kali_present_completed)))
-            if ctx.kali_present_gift_pending then
-                ctx.kali_present_gift_pending=false
-                ctx.log("Kali gift increase attributed to the completed Present; first normal altar check remains available")
-            elseif not ctx.randomizer_state.level_materialized.CHECK_KALI_ALTAR_1 then
+            -- The Present check is independent of normal Kali favor. A
+            -- counter change only tells us to inspect for a native altar
+            -- reward; if this was a Present-only event, the scan finds none
+            -- and the first normal altar check remains available.
+            if not ctx.randomizer_state.level_materialized.CHECK_KALI_ALTAR_1 then
                 local items_before=ctx.kali_known_items or {}
                 if ctx.kali_present_sacrifice_pending then
                     ctx.log("Kali normal gift occurred while the Present replacement was pending; resolving both rewards separately")
