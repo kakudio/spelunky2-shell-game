@@ -3,7 +3,6 @@
 local placements=require "placements"
 local adapters=require "adapters"
 local logic=require "logic"
-local build_config=require "build_config"
 local sparrow=require "sparrow_adapter"
 local duat=require "duat_adapter"
 local M={}
@@ -62,6 +61,7 @@ local DROP_CONFIGS={
     {drop=DROP.ALTAR_KAPALA,check="CHECK_KALI_ALTAR_2",label="Kali Kapala"},
 }
 local YANG_DOOR_TYPES={"FLOOR_DOOR_LOCKED_PEN"}
+local YANG_FAILURE_ENTITY_TYPES={"FLOOR_DOOR_LAYER","FLOOR_DOOR_LOCKED_PEN","LOGICAL_DOOR","BG_SHOP_BACKDOOR","BG_DOOR_FRONT_LAYER","BG_DOOR_BACK_LAYER"}
 
 local function players_have_any(named_types)
     if not named_types or #named_types==0 then return true end
@@ -560,113 +560,21 @@ local function replace_first_kali_gift(ctx,existing_items,attempt,replacement_ui
         ctx.log("Kali first-gift check found no generated reward item near altar; new nearby items: "..(#observed>0 and table.concat(observed,"; ") or "none"))
     end
 end
-local function yang_door_status(door, player)
-    local unlocked,can_enter=nil,nil
-    local unlocked_ok,unlocked_value=pcall(function() return door:is_unlocked() end)
-    if unlocked_ok and type(unlocked_value)=="boolean" then unlocked=unlocked_value end
-    local enter_ok,enter_value=false,nil
-    if player then enter_ok,enter_value=pcall(function() return door:can_enter(player) end) end
-    if enter_ok and type(enter_value)=="boolean" then can_enter=enter_value end
-    return unlocked,can_enter
-end
-
-local function yang_raw_door_lock_details(door)
-    local unlocked_ok,unlocked=pcall(function() return door.unlocked end)
-    local counter_ok,counter=pcall(function() return door.counter end)
-    local overlay_ok,overlay=pcall(function() return door.overlay end)
-    local details={
-        "raw_unlocked="..(unlocked_ok and tostring(unlocked) or "unavailable"),
-        "counter="..(counter_ok and tostring(counter) or "unavailable"),
-        "overlay="..(overlay_ok and tostring(overlay) or "unavailable"),
-    }
-    local grid_ok,grid_uids=pcall(get_entities_overlapping_grid,door.x,door.y,door.layer)
-    if not grid_ok then
-        table.insert(details,"grid=unavailable")
-        return table.concat(details," ")
-    end
-    local grid_entities={}
-    for _,uid in ipairs(grid_uids) do
-        local entity=get_entity(uid)
-        local name=entity and entity.type and get_entity_name(entity.type.id,true) or "missing"
-        table.insert(grid_entities,string.format("%s(uid %d)",name,uid))
-    end
-    table.insert(details,"grid=["..table.concat(grid_entities,", ").."]")
-    return table.concat(details," ")
-end
-
-local function yang_nearby_door_entities(door)
-    -- Static grid inspection cannot reveal a movable, invisible, or FX entity
-    -- that the native door code might use as its lock. Query both layers with
-    -- the normal entity search as well.
-    local ok,uids=pcall(get_entities_at,0,MASK.ANY,door.x,door.y,LAYER.BOTH,0.75)
-    if not ok then return "nearby=unavailable" end
-    local nearby={}
-    for _,uid in ipairs(uids) do
-        local entity=get_entity(uid)
-        if entity then
-            local name=entity.type and get_entity_name(entity.type.id,true) or "unknown"
-            local x,y,layer=door.x,door.y,entity.layer
-            local position_ok,position_x,position_y,position_layer=pcall(get_position,uid)
-            if position_ok then x,y,layer=position_x,position_y,position_layer end
-            local overlay_ok,overlay=pcall(function() return entity.overlay end)
-            local items_ok,items=pcall(function() return entity:get_items() end)
-            local children={}
-            if items_ok and items then for _,child_uid in ipairs(items) do table.insert(children,tostring(child_uid)) end end
-            table.insert(nearby,string.format("%s(type %s uid %d at %.2f,%.2f layer %s overlay %s children [%s])",
-                name,tostring(entity.type and entity.type.id),uid,x,y,tostring(layer),
-                overlay_ok and tostring(overlay) or "unavailable",table.concat(children,",")))
-        end
-    end
-    return "nearby=["..table.concat(nearby,"; ").."]"
-end
-
-local function log_yang_door_status(ctx, label, entries)
-    local player=players and players[1]
-    for _,entry in ipairs(entries) do
-        local door=get_entity(entry.uid)
-        if door then
-            local unlocked,can_enter=yang_door_status(door,player)
-            local lock_text=unlocked==nil and "unlocked=unavailable" or "unlocked="..tostring(unlocked)
-            local enter_text=can_enter==nil and "can_enter=unavailable" or "can_enter="..tostring(can_enter)
-            local raw_details=yang_raw_door_lock_details(door)
-            local nearby_entities=yang_nearby_door_entities(door)
-            ctx.log(string.format("Yang door %s %s uid %d at %.1f, %.1f layer %s %s %s %s %s",label,entry.name,entry.uid,door.x,door.y,tostring(door.layer),lock_text,enter_text,raw_details,nearby_entities))
-        else
-            ctx.log("Yang door "..label.." "..entry.name.." uid "..entry.uid.." no longer exists")
-        end
-    end
-end
-
-local function room_index_text(x,y)
-    local ok,room_x,room_y=pcall(get_room_index,x,y)
-    return ok and string.format("%s,%s",tostring(room_x),tostring(room_y)) or "unavailable"
-end
-
-local function log_yang_room_ownership(ctx, entries)
-    local owned_rooms=state.room_owners and state.room_owners.owned_rooms
-    if not owned_rooms then
-        ctx.log("Yang room ownership diagnostic unavailable: state.room_owners.owned_rooms is missing")
-        return
-    end
-    ctx.log("Yang room ownership diagnostic: "..tostring(#owned_rooms).." owned room(s)")
-    for index,room in ipairs(owned_rooms) do
-        local owner=room.owner_uid and get_entity(room.owner_uid) or nil
-        local owner_name=owner and owner.type and get_entity_name(owner.type.id,true) or "missing owner"
-        ctx.log(string.format("Yang owned-room entry %d: owner uid %s (%s), room_index=%s, layer=%s",index,tostring(room.owner_uid),tostring(owner_name),tostring(room.room_index),tostring(room.layer)))
-    end
-    for _,entry in ipairs(entries) do
-        local door=get_entity(entry.uid)
-        if door then
-            local x,y=door.x,door.y
-            ctx.log(string.format("Yang door room neighbors %s uid %d at %.1f, %.1f: left=%s right=%s below=%s above=%s",entry.name,entry.uid,x,y,
-                room_index_text(x-0.6,y),room_index_text(x+0.6,y),room_index_text(x,y-0.6),room_index_text(x,y+0.6)))
+local function log_yang_anchor_failure(ctx)
+    ctx.log("Yang native locked-pen anchor missing; nearby door diagnostics follow")
+    for _,type_name in ipairs(YANG_FAILURE_ENTITY_TYPES) do
+        local entity_type=placements.type_of(type_name)
+        for _,uid in ipairs(entity_type and get_entities_by_type(entity_type) or {}) do
+            local entity=get_entity(uid)
+            if entity then
+                ctx.log(string.format("Yang anchor diagnostic %s uid %d at %.1f, %.1f layer %s",type_name,uid,entity.x,entity.y,tostring(entity.layer)))
+            end
         end
     end
 end
 
 local function yang_position(ctx, yang)
     local best,best_name,best_distance=nil,nil,math.huge
-    local diagnostics={}
     ctx.log(string.format("Yang is at %.1f, %.1f layer %s; scanning native locked-pen door",yang.x,yang.y,tostring(yang.layer)))
     for _,name in ipairs(YANG_DOOR_TYPES) do
         local kind=placements.type_of(name)
@@ -674,16 +582,6 @@ local function yang_position(ctx, yang)
             for _,uid in ipairs(get_entities_by_type(kind)) do
                 local door=get_entity(uid)
                 if door then
-                    local distance=math.abs(door.x-yang.x)+math.abs(door.y-yang.y)
-                    -- `unlocked` is not a documented entity field. Probe the
-                    -- Door virtual methods instead; `can_enter` exposes the
-                    -- quest-specific behavior that a generic lock check misses.
-                    local player=players and players[1]
-                    local unlocked,can_enter=yang_door_status(door,player)
-                    local lock_text=unlocked==nil and "unlocked=unavailable" or "unlocked="..tostring(unlocked)
-                    local enter_text=can_enter==nil and "can_enter=unavailable" or "can_enter="..tostring(can_enter)
-                    ctx.log(string.format("Yang door candidate %s uid %d at %.1f, %.1f layer %s distance %.1f %s %s",name,uid,door.x,door.y,tostring(door.layer),distance,lock_text,enter_text))
-                    table.insert(diagnostics,{uid=uid,name=name})
                     local horizontal_distance=math.abs(door.x-yang.x)
                     if horizontal_distance<best_distance then
                         best,best_name,best_distance=door,name,horizontal_distance
@@ -692,21 +590,13 @@ local function yang_position(ctx, yang)
             end
         end
     end
-    if build_config.developer_options and #diagnostics>0 then
-        for _,frames in ipairs({1,10,60}) do
-            local delay=frames
-            ctx.defer(delay,"Yang door late-state diagnostic",function()
-                log_yang_door_status(ctx,"after "..delay.." frame(s)",diagnostics)
-            end)
-        end
-        ctx.defer(1,"Yang room ownership diagnostic",function() log_yang_room_ownership(ctx,diagnostics) end)
-    end
     if best then
         local direction=best.x>=yang.x and 1 or -1
         ctx.log(string.format("Yang reward anchor uses native locked pen %s at %.1f, %.1f (horizontal distance %.1f)",best_name,best.x,best.y,best_distance))
         return best.x+direction,best.y,LAYER.BACK
     end
     ctx.log("Yang reward anchor found no native locked-pen door; Yang check was not placed")
+    log_yang_anchor_failure(ctx)
     return nil
 end
 
