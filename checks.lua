@@ -61,7 +61,7 @@ local DROP_CONFIGS={
     {drop=DROP.BEG_TRUECROWN,check="CHECK_BEG_TRUE_CROWN",label="Beg True Crown"},
     {drop=DROP.ALTAR_KAPALA,check="CHECK_KALI_ALTAR_2",label="Kali Kapala"},
 }
-local YANG_DOOR_TYPES={"BG_DOOR_BACK_LAYER","FLOOR_DOOR_LAYER","FLOOR_DOOR_LOCKED"}
+local YANG_DOOR_TYPES={"FLOOR_DOOR_LOCKED_PEN","BG_DOOR_BACK_LAYER","FLOOR_DOOR_LAYER"}
 
 local function players_have_any(named_types)
     if not named_types or #named_types==0 then return true end
@@ -665,7 +665,7 @@ local function log_yang_room_ownership(ctx, entries)
 end
 
 local function yang_position(ctx, yang)
-    local best,best_name,best_distance=nil,nil,math.huge
+    local best,best_name,best_distance,best_is_locked_pen=nil,nil,math.huge,false
     local diagnostics={}
     local treasure_door_y=yang.y-5
     ctx.log(string.format("Yang is at %.1f, %.1f layer %s; scanning candidate doors on row %.1f",yang.x,yang.y,tostring(yang.layer),treasure_door_y))
@@ -686,11 +686,16 @@ local function yang_position(ctx, yang)
                     local enter_text=can_enter==nil and "can_enter=unavailable" or "can_enter="..tostring(can_enter)
                     ctx.log(string.format("Yang door candidate %s uid %d at %.1f, %.1f layer %s distance %.1f row offset %.3f %s %s",name,uid,door.x,door.y,tostring(door.layer),distance,row_offset,lock_text,enter_text))
                     table.insert(diagnostics,{uid=uid,name=name})
-                    -- Across every recorded Yang layout, his treasure door
-                    -- is exactly five tiles below him. Restrict selection to
-                    -- that row; other locks and nearby doors are unrelated.
-                    if row_offset<=0.5 and math.abs(door.x-yang.x)<best_distance then
-                        best,best_name,best_distance=door,name,math.abs(door.x-yang.x)
+                    -- Yang's turkey pen has its own foreground entity. This
+                    -- is the native lock-bearing entity, unlike the generic
+                    -- layer door and background art at the same coordinate.
+                    -- Prefer it unconditionally; row-5 matching remains a
+                    -- guarded fallback for a future API/game mismatch.
+                    local is_locked_pen=name=="FLOOR_DOOR_LOCKED_PEN"
+                    local horizontal_distance=math.abs(door.x-yang.x)
+                    if (is_locked_pen and (not best_is_locked_pen or horizontal_distance<best_distance))
+                        or (not best_is_locked_pen and not is_locked_pen and row_offset<=0.5 and horizontal_distance<best_distance) then
+                        best,best_name,best_distance,best_is_locked_pen=door,name,horizontal_distance,is_locked_pen
                     end
                 end
             end
@@ -707,7 +712,8 @@ local function yang_position(ctx, yang)
     end
     if best then
         local direction=best.x>=yang.x and 1 or -1
-        ctx.log(string.format("Yang reward anchor uses closest row-5 %s at %.1f, %.1f (horizontal distance %.1f)",best_name,best.x,best.y,best_distance))
+        local selection=best_is_locked_pen and "native locked pen" or "row-5 fallback"
+        ctx.log(string.format("Yang reward anchor uses %s %s at %.1f, %.1f (horizontal distance %.1f)",selection,best_name,best.x,best.y,best_distance))
         return best.x+direction,best.y,LAYER.BACK
     end
     ctx.log("Yang reward anchor found no door on Yang's row minus five; using fallback coordinate")
