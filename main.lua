@@ -148,7 +148,13 @@ end
 local saved_seed_for_menu=load_persisted_seed()
 if saved_seed_for_menu then options.d_seed=saved_seed_for_menu end
 local saved_adventure_seed_for_menu=load_persisted_adventure_seed()
-if saved_adventure_seed_for_menu then options.o_dev_adventure_seed=saved_adventure_seed_for_menu end
+if saved_adventure_seed_for_menu then
+    options.o_dev_adventure_seed=saved_adventure_seed_for_menu
+    -- A recorded run seed is for replaying after a relaunch. The toggle used
+    -- to remain false by default, making the restored field look saved while
+    -- silently allowing a different new adventure seed to be generated.
+    options.n_dev_use_adventure_seed=true
+end
 local function initialize()
     if randomizer_state.initialized then return end
     randomizer_state.seed=tonumber(options.d_seed) or 0
