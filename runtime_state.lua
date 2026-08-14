@@ -18,7 +18,7 @@ function M.new(randomizer_state, initialize, log, is_kali_item_recovery_enabled,
         humphead_hooks={}, yeti_hooks={}, lahamu_hooks={}, vlad_hooks={}, tiamat_hooks={}, eggplant_king_hooks={},
         pending_yeti_drops={}, spawn_replacements={}, moon_bows={}, moon_hidden_bows={}, sun_challenge_bags={},
         lahamu_diagnostic_logged=false,
-        moon_handoff_spawning=false, kali_last_gifts=nil, kali_known_items={},
+        moon_handoff_spawning=false, kali_last_gifts=nil, kali_known_items={}, kali_first_gift_completed=false,
         kali_presents={}, kali_present_source_placed=false, kali_present_completed=false,
         kali_present_sacrifice_pending=false, kali_present_source_uid=nil, kali_present_source_seen=false, kali_present_source_location=nil,
         duat_recovery=nil, duat_recovery_spawned=false,
@@ -67,6 +67,7 @@ function M.reset_run(ctx)
     ctx.progression.pending_gate_items={}
     ctx.kali_last_gifts=nil
     ctx.kali_known_items={}
+    ctx.kali_first_gift_completed=false
     ctx.kali_presents={}
     ctx.kali_present_source_placed=false
     ctx.kali_present_completed=false

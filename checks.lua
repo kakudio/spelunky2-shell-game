@@ -504,6 +504,7 @@ local function place_kali_present_source(ctx)
     ctx.log("Kali Present altar level has no pet; will try the next eligible level")
 end
 local function replace_first_kali_gift(ctx,existing_items,attempt,replacement_uid)
+    if ctx.kali_first_gift_completed then return end
     local player=players and players[1]
     if not player then return end
     local altar=nearest_kali_altar(player.x,player.y,player.layer)
@@ -512,6 +513,7 @@ local function replace_first_kali_gift(ctx,existing_items,attempt,replacement_ui
     local observed={}
     local pending_present=ctx.pending_kali_present_payload
     local eggplant_type=placements.type_of("ITEM_EGGPLANT")
+    local kapala_type=placements.type_of("ITEM_PICKUP_KAPALA")
     for _,uid in ipairs(get_entities_by(0,MASK.ITEM,LAYER.BOTH)) do
         local item=get_entity(uid)
         if item and not existing_items[uid] and item.layer==altar.layer then
@@ -529,7 +531,10 @@ local function replace_first_kali_gift(ctx,existing_items,attempt,replacement_ui
                     uid==replacement_uid and " (prior replacement)" or "",
                     is_pending_present_payload and " (pending Present payload)" or ""))
             end
-            if distance<=3 and uid~=replacement_uid and not is_pending_present_payload then
+            -- Kapala is the separate second Kali check, replaced through its
+            -- dedicated native DROP hook. Never let the first-gift scan claim
+            -- it when the counter jumps across the Kapala threshold.
+            if distance<=3 and uid~=replacement_uid and not is_pending_present_payload and item.type.id~=kapala_type then
                 table.insert(candidates,{entity=item,distance=distance})
             end
         end
@@ -543,6 +548,7 @@ local function replace_first_kali_gift(ctx,existing_items,attempt,replacement_ui
         -- Replace the first one, then keep this source window open briefly
         -- to remove only any additional native altar payloads.
         replacement_uid=materialize(ctx,"CHECK_KALI_ALTAR_1",candidate.x,candidate.y,candidate.layer,candidate.uid,true,false)
+        if replacement_uid then ctx.kali_first_gift_completed=true end
         ctx.log("Kali first-gift replacement result uid "..tostring(replacement_uid))
     end
     if replacement_uid then
@@ -1308,7 +1314,7 @@ function M.register_spawn_hooks(ctx)
             -- counter change only tells us to inspect for a native altar
             -- reward; if this was a Present-only event, the scan finds none
             -- and the first normal altar check remains available.
-            if not ctx.randomizer_state.level_materialized.CHECK_KALI_ALTAR_1 then
+            if not ctx.kali_first_gift_completed then
                 local items_before=ctx.kali_known_items or {}
                 if ctx.kali_present_sacrifice_pending then
                     ctx.log("Kali normal gift occurred while the Present replacement was pending; resolving both rewards separately")
