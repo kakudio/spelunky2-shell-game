@@ -58,7 +58,7 @@ local DROP_CONFIGS={
     {drop=DROP.SPARROW_ROPEPILE,check="CHECK_SPARROW",label="Sparrow Rope Pile"},
     {drop=DROP.BEG_BOMBBAG,check="CHECK_BEG_FIRST_MEETING",label="Beg Bomb Bag"},
     {drop=DROP.BEG_TRUECROWN,check="CHECK_BEG_TRUE_CROWN",label="Beg True Crown"},
-    {drop=DROP.ALTAR_KAPALA,check="CHECK_KALI_ALTAR_2",label="Kali Kapala"},
+    {drop=DROP.ALTAR_KAPALA,check="CHECK_KALI_ALTAR_2",label="Kali Kapala",run_flag="kali_second_gift_completed"},
 }
 local YANG_DOOR_TYPES={"FLOOR_DOOR_LOCKED_PEN"}
 local YANG_FAILURE_ENTITY_TYPES={"FLOOR_DOOR_LAYER","FLOOR_DOOR_LOCKED_PEN","LOGICAL_DOOR","BG_SHOP_BACKDOOR","BG_DOOR_FRONT_LAYER","BG_DOOR_BACK_LAYER"}
@@ -117,7 +117,7 @@ end
 local function configure_drop_substitutions(ctx)
     ctx.drop_configured=ctx.drop_configured or {}
     for _,config in ipairs(DROP_CONFIGS) do
-        local active=not config.theme or state.theme==config.theme
+        local active=(not config.theme or state.theme==config.theme) and not (config.run_flag and ctx[config.run_flag])
         local reward,ent_type=nil,nil
         if active then reward,ent_type=placements.reward_type(ctx.randomizer_state,config.check) end
         if active and ent_type then
@@ -1321,6 +1321,13 @@ function M.register_spawn_hooks(ctx)
                 end
                 ctx.log("Kali first-gift replacement scheduled with "..tostring(next(items_before) and "a prior item snapshot" or "an empty prior item snapshot"))
                 ctx.defer(1,"Kali first-gift replacement",function() replace_first_kali_gift(ctx,items_before) end)
+            end
+            if ctx.kali_last_gifts<3 and gifts>=3 then
+                -- Kapala is a direct DROP replacement, so its native reward
+                -- has already been substituted by the time kali_gifts moves
+                -- past the threshold. Disable that substitution next level.
+                ctx.kali_second_gift_completed=true
+                ctx.log("Kali Kapala check completed; direct replacement disarmed for the rest of this run")
             end
             ctx.kali_last_gifts=gifts
         end
