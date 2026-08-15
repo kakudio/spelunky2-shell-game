@@ -613,13 +613,15 @@ function M.replace_excalibur_if_gated(ctx, attempt)
     -- Excalibur's stone only exists in Tide Pool 4-2. Restricting this avoids
     -- scanning player-carried swords (and retrying) on Tide Pool 4-1/4-3.
     if state.theme~=THEME.TIDE_POOL or state.level~=2 or ctx.randomizer_state.level_materialized.CHECK_EXCALIBUR_STONE then return end
-    if not (ctx.progression.crown or ctx.progression.hedjet) then
-        ctx.log("Excalibur gate is closed: no collected Crown or Hedjet")
+    local has_crown=players_have_any({"ITEM_PICKUP_CROWN"})
+    local has_hedjet=players_have_any({"ITEM_PICKUP_HEDJET"})
+    if not (has_crown or has_hedjet) then
+        ctx.log("Excalibur gate is closed: no player holds a Crown or Hedjet")
         return
     end
     local excalibur_type=placements.type_of("ITEM_EXCALIBUR")
     local swords=excalibur_type and get_entities_by_type(excalibur_type) or {}
-    ctx.log(string.format("Excalibur gate is open (Crown=%s Hedjet=%s); found %d sword-in-stone entities",tostring(ctx.progression.crown),tostring(ctx.progression.hedjet),#swords))
+    ctx.log(string.format("Excalibur gate is open (Crown=%s Hedjet=%s); found %d sword-in-stone entities",tostring(has_crown),tostring(has_hedjet),#swords))
     for _,uid in ipairs(swords) do
         local sword=get_entity(uid)
         if sword then
@@ -1056,22 +1058,6 @@ function M.register_spawn_hooks(ctx)
             observe_pending_quest_reward(ctx,entity)
         end,SPAWN_TYPE.ANY,0,reward_type)
     end
-    -- `touch` becomes zero on a player pickup. We only track the particular
-    -- Crown/Hedjet entities this randomizer materialized, so other items do
-    -- not accidentally satisfy the logic gate.
-    set_callback(function()
-        for uid,flag in pairs(ctx.progression.pending_gate_items) do
-            local item=get_entity(uid)
-            if item and item.touch==0 then
-                ctx.progression[flag]=true
-                ctx.progression.pending_gate_items[uid]=nil
-                ctx.log("Collected "..flag.."; Excalibur gate is now open")
-            elseif not item then
-                ctx.progression.pending_gate_items[uid]=nil
-            end
-        end
-    end,ON.FRAME)
-
     local udjat_type=placements.type_of("ITEM_PICKUP_UDJATEYE")
     if not udjat_type then return end
     set_pre_entity_spawn(function(entity_type,x,y,layer)

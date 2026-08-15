@@ -238,7 +238,7 @@ set_callback(function()
     local report_path=logger.begin_run(randomizer_state,logic,generate_spoiler,generate_logs)
     if report_path then log("Run report started: Mods/Data/KeyItemRandomizer/"..report_path)
     elseif generate_spoiler or generate_logs then log("WARNING: could not create this run's report file") end
-    log("Reset Crown/Hedjet progression for new run")
+    log("Reset run-scoped randomizer state for new run")
     if developer_options and options.q_dev_test_resources then
         for _,player in ipairs(players) do
             player.health=50
@@ -261,7 +261,6 @@ set_callback(function()
             grant_test_scepter(player)
             grant_test_tusk_idol(player)
             grant_test_floor_item(player,placements.type_of("ITEM_EGGPLANT"),"Eggplant")
-            runtime_context.progression.crown=true
         end
         log("Test resources granted: $1,000,000, 50 health/bombs/ropes, Udjat Eye, Ankh, Crown, Skeleton Key, Alien Compass, Tablet of Destiny, Spike Shoes, Excalibur, Vlad's Cape, and a Scepter, Tusk Idol, and Eggplant at each player's position")
     end

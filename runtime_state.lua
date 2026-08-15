@@ -28,7 +28,6 @@ function M.new(randomizer_state, initialize, log, is_kali_item_recovery_enabled,
         duat_recovery_seen_items={},
         sparrow_last_state=nil, sparrow_last_transition=nil,
         drop_configured={}, humphead_drop_configured=false,
-        progression={crown=false,hedjet=false,pending_gate_items={}},
         initialize=initialize, log=log,
         is_kali_item_recovery_enabled=is_kali_item_recovery_enabled,
         is_balanced_duat_kali_rewards_enabled=is_balanced_duat_kali_rewards_enabled,
@@ -62,9 +61,6 @@ function M.reset_level(ctx)
 end
 
 function M.reset_run(ctx)
-    ctx.progression.crown=false
-    ctx.progression.hedjet=false
-    ctx.progression.pending_gate_items={}
     ctx.kali_last_gifts=nil
     ctx.kali_known_items={}
     ctx.kali_first_gift_completed=false
