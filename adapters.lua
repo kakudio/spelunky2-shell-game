@@ -4,51 +4,23 @@ local placements=require "placements"
 local policy=require "replacement_policy"
 local M={}
 
-local function liquid_directly_below(x,y,layer)
-    if not get_liquids_at then return false end
-    local ok,water,lava=pcall(get_liquids_at,x,y-1,layer)
-    return ok and ((water or 0)>0 or (lava or 0)>0)
-end
-
-local function ground_below(x,y,layer)
-    if not get_grid_entity_at then return nil end
-    -- Grid coordinates use tile centres. Start with the tile directly below
-    -- the source, then find the first actual block below it.
-    for ground_y=math.floor(y-0.5),0,-1 do
-        local uid=get_grid_entity_at(x,ground_y,layer)
-        if uid and uid~=-1 then return ground_y end
-    end
-    return nil
-end
-
-local function log_eggplant_spawn_position(ctx,uid)
-    local eggplant=uid and get_entity(uid) or nil
-    if eggplant then
-        ctx.log(string.format("Eggplant spawned uid %d at %.2f, %.2f layer %s",uid,eggplant.x,eggplant.y,tostring(eggplant.layer)))
-    else
-        ctx.log("Eggplant spawn returned no entity uid")
-    end
-    return uid
-end
-
 local function spawn_reward(ctx,reward,ent_type,x,y,layer,snap_to_floor)
     if reward~="REWARD_EGGPLANT" then return placements.spawn(ent_type,x,y,layer,snap_to_floor) end
-
-    -- Eggplant must not take a small spawn fall, which breaks it. Make its
-    -- behavior global, rather than depending on individual check adapters.
-    -- Liquids directly under the source are the deliberate exception: retain
-    -- the normal fall so water/lava can consume it just like other items.
-    if liquid_directly_below(x,y,layer) then
-        ctx.log("Eggplant spawn above liquid; leaving it unsnapped at its source")
-        return log_eggplant_spawn_position(ctx,placements.spawn(ent_type,x,y,layer,false))
+    -- A Present safely carries the fragile Eggplant through every delivery
+    -- path, including native boss drops that apply their own toss physics.
+    local present_type=placements.type_of("ITEM_PRESENT")
+    local eggplant_type=placements.type_of("ITEM_EGGPLANT")
+    if not (present_type and eggplant_type) then
+        ctx.log("Eggplant Present adapter unavailable; spawning a direct Eggplant")
+        return placements.spawn(ent_type,x,y,layer,snap_to_floor)
     end
-    local ground_y=ground_below(x,y,layer)
-    if ground_y then
-        ctx.log(string.format("Eggplant snapped to ground below source at %.1f, %.1f",x,ground_y+1))
-        return log_eggplant_spawn_position(ctx,placements.spawn(ent_type,x,ground_y+1,layer,true))
+    local uid=placements.spawn(present_type,x,y,layer,snap_to_floor)
+    local present=uid and get_entity(uid) or nil
+    if present then
+        present.inside=eggplant_type
+        ctx.log(string.format("Eggplant reward spawned as Present uid %d at %.2f, %.2f layer %s",uid,present.x,present.y,tostring(present.layer)))
     end
-    ctx.log("Eggplant spawn found no ground below source; leaving it unsnapped")
-    return log_eggplant_spawn_position(ctx,placements.spawn(ent_type,x,y,layer,false))
+    return uid
 end
 
 function M.materialize(ctx, check, x, y, layer, source_uid, snap, safe_delivery)
@@ -66,7 +38,7 @@ function M.materialize(ctx, check, x, y, layer, source_uid, snap, safe_delivery)
     local spawned_uid
     if reward=="REWARD_EGGPLANT" then
         -- Keep source destruction and materialization bookkeeping in one
-        -- place, but use the global Eggplant ground/liquid placement rule.
+        -- place, but deliver it in a Present rather than as a fragile drop.
         if source_uid then local source=get_entity(source_uid); if source then source:destroy() end end
         spawned_uid=spawn_reward(ctx,reward,placements.type_of("ITEM_EGGPLANT"),x,y,layer,snap)
         ctx.randomizer_state.level_materialized[check]=true
