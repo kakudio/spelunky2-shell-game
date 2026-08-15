@@ -1258,13 +1258,13 @@ function M.register_spawn_hooks(ctx)
         ctx.log("Sun Challenge supplies adapter unavailable: ITEM_PICKUP_PLAYERBAG is missing")
     end
 
-    -- Tusk's fifth successful seven is the final prize. At four prizes won,
-    -- substitute only an item emitted beside her prize dispenser; ordinary
-    -- shop spawns and the first four prizes remain vanilla.
+    -- The game increments won_prizes_count before spawning the associated
+    -- prize. Wait for five so only Tusk's fifth successful seven is replaced;
+    -- the first four prizes remain vanilla.
     set_pre_entity_spawn(function(entity_type,x,y,layer)
         if state.theme~=THEME.TIDE_POOL or ctx.randomizer_state.level_materialized.CHECK_TUSK_DICE_HOUSE then return nil end
         local dice=state.logic and state.logic.diceshop
-        if not dice or dice.won_prizes_count~=4 or not dice.prize_dispenser or dice.prize_dispenser<0 then return nil end
+        if not dice or dice.won_prizes_count~=5 or not dice.prize_dispenser or dice.prize_dispenser<0 then return nil end
         local dispenser=get_entity(dice.prize_dispenser)
         if not dispenser or dispenser.layer~=layer or math.abs(dispenser.x-x)+math.abs(dispenser.y-y)>3 then return nil end
         local reward=placements.reward_type(ctx.randomizer_state,"CHECK_TUSK_DICE_HOUSE")
