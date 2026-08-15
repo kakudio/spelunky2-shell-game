@@ -21,6 +21,16 @@ local function ground_below(x,y,layer)
     return nil
 end
 
+local function log_eggplant_spawn_position(ctx,uid)
+    local eggplant=uid and get_entity(uid) or nil
+    if eggplant then
+        ctx.log(string.format("Eggplant spawned uid %d at %.2f, %.2f layer %s",uid,eggplant.x,eggplant.y,tostring(eggplant.layer)))
+    else
+        ctx.log("Eggplant spawn returned no entity uid")
+    end
+    return uid
+end
+
 local function spawn_reward(ctx,reward,ent_type,x,y,layer,snap_to_floor)
     if reward~="REWARD_EGGPLANT" then return placements.spawn(ent_type,x,y,layer,snap_to_floor) end
 
@@ -30,15 +40,15 @@ local function spawn_reward(ctx,reward,ent_type,x,y,layer,snap_to_floor)
     -- the normal fall so water/lava can consume it just like other items.
     if liquid_directly_below(x,y,layer) then
         ctx.log("Eggplant spawn above liquid; leaving it unsnapped at its source")
-        return placements.spawn(ent_type,x,y,layer,false)
+        return log_eggplant_spawn_position(ctx,placements.spawn(ent_type,x,y,layer,false))
     end
     local ground_y=ground_below(x,y,layer)
     if ground_y then
         ctx.log(string.format("Eggplant snapped to ground below source at %.1f, %.1f",x,ground_y+1))
-        return placements.spawn(ent_type,x,ground_y+1,layer,true)
+        return log_eggplant_spawn_position(ctx,placements.spawn(ent_type,x,ground_y+1,layer,true))
     end
     ctx.log("Eggplant spawn found no ground below source; leaving it unsnapped")
-    return placements.spawn(ent_type,x,y,layer,false)
+    return log_eggplant_spawn_position(ctx,placements.spawn(ent_type,x,y,layer,false))
 end
 
 function M.materialize(ctx, check, x, y, layer, source_uid, snap, safe_delivery)
