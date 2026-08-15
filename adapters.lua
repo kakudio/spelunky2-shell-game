@@ -85,7 +85,16 @@ function M.replace_native_spawn(ctx,check,reward,x,y,layer,safe_delivery)
     local uid=spawn_reward(ctx,reward,ent_type,x,y,layer,false)
     ctx.spawn_replacements[check]=nil
     placements.configure_reward(uid,reward)
-    if uid then ctx.lifecycle:mark(check,"materialized") end
+    if uid then
+        ctx.lifecycle:mark(check,"materialized")
+        -- Native reward hooks bypass materialize(), so preserve its
+        -- Crown/Hedjet progression bookkeeping for Excalibur's gate.
+        local flag=reward=="REWARD_CROWN" and "crown" or reward=="REWARD_HEDJET" and "hedjet" or nil
+        if flag then
+            ctx.progression.pending_gate_items[uid]=flag
+            ctx.log("Tracking "..flag.." pickup for Excalibur progression (uid "..uid..")")
+        end
+    end
     return uid
 end
 
