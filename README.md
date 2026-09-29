@@ -1,6 +1,6 @@
-# Key Item Randomizer - Spelunky 2
+# Shell Game — a key item randomizer for Spelunky 2
 
-A Spelunky 2 randomizer mod that shuffles key progression items to create unique paths to Hundun and Cosmic Ocean.
+Shell Game is a key item randomizer for Spelunky 2 that shuffles key progression items to create unique paths to Hundun and Cosmic Ocean.
 
 ## Current implementation
 
@@ -64,15 +64,13 @@ The randomizer can create paths like:
 3. **Playlunky** - Installed via Modlunky 2's "Playlunky" tab
 
 ### Steps
-1. Open Modlunky 2
-2. Go to **Mods** tab → **Open Mods Folder**
-3. Create a new folder: `KeyItemRandomizer`
-4. Copy `main.lua` into this folder
+1. Download `Spelunky2-ShellGame-vX.Y.Z.zip` from the [latest GitHub release](../../releases/latest)
+2. Open Modlunky 2
+3. Go to **Mods** tab → **Open Mods Folder**
+4. Extract the downloaded archive into the Mods folder
 5. In Modlunky 2, go to **Playlunky** tab
-6. Find "KeyItemRandomizer" in the mod list and enable it
+6. Find **Shell Game** in the mod list and enable it
 7. Click **Play!** to launch Spelunky 2 with the mod
-
-Release downloads are available from the [latest GitHub release](../../releases/latest). Extract the downloaded archive into a `KeyItemRandomizer` folder in Modlunky 2's **Mods** folder, then enable it in Playlunky.
 
 ## Configuration
 
@@ -80,7 +78,7 @@ Access options via Modlunky 2's options menu or Overlunky (F8) → Options:
 
 | Option | Description |
 |--------|-------------|
-| **Enable Key Item Randomizer** | Master toggle |
+| **Enable Shell Game** | Master toggle |
 | **Randomizer Seed** | Choose a fixed seed; `0` generates a new layout at run start |
 | **New Seed** | Sets the seed to `0`, causing the next run to generate a new layout |
 | **Kali Item Recovery** | Restores held and allowed altar-dropped items from City of Gold to Duat |
@@ -93,11 +91,13 @@ Access options via Modlunky 2's options menu or Overlunky (F8) → Options:
 ## Reporting an Issue
 
 Leave **Generate Spoiler** and **Generate Logs** enabled. At the start of every
-run, the mod writes one report to `Mods/Data/KeyItemRandomizer/run_reports/`.
+run, the mod writes one report to the `run_reports/` folder in its data folder;
+for an install extracted from the release archive, that is
+`Mods/Data/ShellGame/run_reports/`.
 Either option can create that same file, containing its enabled section(s).
 Attach the newest `.txt` file when reporting a problem; with both enabled, it
 includes the randomizer seed, the game adventure seed, the full spoiler mapping,
-and all Key Item Randomizer logs.
+and all Shell Game logs.
 Use `kir_report_path()` in the Overlunky console to print the current report's
 location. The mod retains the newest 30 reports and deletes older reports
 automatically.
@@ -145,7 +145,7 @@ ENT_TYPE.ITEM_PICKUP_SKELETON_KEY
 
 To modify the mod:
 1. Edit the mod files.
-2. Run `powershell -ExecutionPolicy Bypass -File .\scripts\package.ps1` to create `dist/KeyItemRandomizer-vX.Y.Z.zip`.
+2. Run `powershell -ExecutionPolicy Bypass -File .\scripts\package.ps1` to create `dist/Spelunky2-ShellGame-vX.Y.Z.zip` and `dist/Spelunky2-ShellGame-vX.Y.Z-dev.zip`, each holding a single `ShellGame` folder.
 3. Reload scripts in Overlunky (Ctrl+F5) or restart game, then check the console (`~`) for logs.
 
 ## Releasing
