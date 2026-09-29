@@ -12,7 +12,7 @@ end
 
 function M.log(message)
     run_report.log(message)
-    if M.overlay_runtime_logs then print("[KeyItemRandomizer] "..message) end
+    if M.overlay_runtime_logs then print("[ShellGame] "..message) end
 end
 
 function M.begin_run(randomizer_state,logic,write_spoiler,write_logs)
