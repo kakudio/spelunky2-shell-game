@@ -22,7 +22,7 @@ local function prune_old_reports()
     if not list_data_dir or not os.remove_data then return end
     local reports={}
     for _,path in ipairs(list_data_dir("run_reports") or {}) do
-        if path:match("^run_reports/.+%-KeyItemRandomizer%-.+%.txt$") then table.insert(reports,path) end
+        if path:match("^run_reports/.+%-ShellGame%-.+%.txt$") then table.insert(reports,path) end
     end
     table.sort(reports)
     while #reports>REPORT_LIMIT do
@@ -50,10 +50,10 @@ function M.begin(randomizer_state,logic,write_spoiler,write_logs)
     M.run_number=M.run_number+1
     local run_seed=game_seed():gsub("[^%w%-_,]","_")
     local timestamp=os.date("%Y%m%d-%H%M%S")
-    M.filename=string.format("run_reports/%s-KeyItemRandomizer-randomizer-%s-run-%s-%d.txt",timestamp,tostring(randomizer_state.seed or "unknown"),run_seed,M.run_number)
+    M.filename=string.format("run_reports/%s-ShellGame-randomizer-%s-run-%s-%d.txt",timestamp,tostring(randomizer_state.seed or "unknown"),run_seed,M.run_number)
     local file=io.open_data(M.filename,"w")
     if not file then M.write_failed=true; return nil end
-    file:write("Key Item Randomizer run report\n")
+    file:write("Shell Game run report\n")
     file:write("Randomizer seed: ",tostring(randomizer_state.seed),"\n")
     file:write("Game adventure run seed: ",game_seed(),"\n")
     file:write("Logic version: ",tostring(logic.LOGIC_VERSION),"\n")

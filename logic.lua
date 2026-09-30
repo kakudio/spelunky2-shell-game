@@ -1,4 +1,4 @@
--- Pure deterministic logic for Key Item Randomizer.
+-- Pure deterministic logic for Shell Game.
 -- This file deliberately has no Overlunky API calls, so its generator and
 -- validator can be exercised from the in-game console and reviewed in isolation.
 

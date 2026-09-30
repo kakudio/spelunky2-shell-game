@@ -44,7 +44,7 @@ if ([System.IO.Path]::IsPathRooted($OutputDirectory)) {
 }
 New-Item -ItemType Directory -Force -Path $resolvedOutputDirectory | Out-Null
 
-$temporaryRoot=Join-Path ([System.IO.Path]::GetTempPath()) ("KeyItemRandomizer-package-"+[Guid]::NewGuid().ToString("N"))
+$temporaryRoot=Join-Path ([System.IO.Path]::GetTempPath()) ("ShellGame-package-"+[Guid]::NewGuid().ToString("N"))
 try {
     New-Item -ItemType Directory -Force -Path $temporaryRoot | Out-Null
     $variants=@(
@@ -52,7 +52,7 @@ try {
         @{ Suffix="-dev"; Developer=$true; OverlayLogging=$true }
     )
     foreach ($variant in $variants) {
-        $stageDirectory=Join-Path $temporaryRoot ("stage"+$variant.Suffix)
+        $stageDirectory=Join-Path (Join-Path $temporaryRoot ("stage"+$variant.Suffix)) "ShellGame"
         New-Item -ItemType Directory -Force -Path $stageDirectory | Out-Null
         foreach ($file in $packageFiles) {
             Copy-Item -LiteralPath (Join-Path $projectRoot $file) -Destination (Join-Path $stageDirectory $file)
@@ -60,11 +60,10 @@ try {
         $developerValue=$variant.Developer.ToString().ToLowerInvariant()
         $loggingValue=$variant.OverlayLogging.ToString().ToLowerInvariant()
         [System.IO.File]::WriteAllText((Join-Path $stageDirectory "build_config.lua"),"return { developer_options=$developerValue, default_overlay_runtime_logs=$loggingValue }`n")
-        $archiveName="KeyItemRandomizer-v$($manifest.version)$($variant.Suffix).zip"
+        $archiveName="Spelunky2-ShellGame-v$($manifest.version)$($variant.Suffix).zip"
         $archivePath=Join-Path $resolvedOutputDirectory $archiveName
         if (Test-Path -LiteralPath $archivePath) { Remove-Item -LiteralPath $archivePath -Force }
-        $sourcePaths=$packageFiles | ForEach-Object { Join-Path $stageDirectory $_ }
-        Compress-Archive -LiteralPath $sourcePaths -DestinationPath $archivePath -CompressionLevel Optimal
+        Compress-Archive -LiteralPath $stageDirectory -DestinationPath $archivePath -CompressionLevel Optimal
         Write-Host "Created $archivePath"
     }
 } finally {

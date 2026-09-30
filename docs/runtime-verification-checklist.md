@@ -33,6 +33,6 @@ The following adapters also need one in-game test whenever their code changes:
 | Sparrow Vault | Open exactly four vault chests in Neo Babylon 6-3, then speak to Sparrow. | Her quest-completion Player Bag is the mapped reward. |
 | Eggplant King | Defeat Yama in Eggplant World. | The Eggplant Crown death drop is replaced with the mapped reward. |
 
-If an adapter fails, capture the lines beginning `[KeyItemRandomizer]` from
+If an adapter fails, capture the lines beginning `[ShellGame]` from
 the moment the level loads through the reward appearing. Include the randomizer
 seed shown by `kir_spoiler()`.

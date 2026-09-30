@@ -1,4 +1,4 @@
--- Key Item Randomizer entry point: options, seed persistence, runtime lifecycle, UI commands.
+-- Shell Game entry point: options, seed persistence, runtime lifecycle, UI commands.
 local logic=require "logic"
 local checks=require "checks"
 local placements=require "placements"
@@ -8,6 +8,20 @@ local logger=require "logger"
 local build_config=require "build_config"
 local persisted_options=options
 local options
+
+-- Mirrors io.open_data: packs use the install folder name, loose scripts the file name.
+local function data_folder()
+    local ok,script_path=pcall(get_script_id)
+    if not ok or type(script_path)~="string" then script_path=__script_id end
+    if type(script_path)~="string" then return nil end
+    script_path=script_path:gsub("\\","/")
+    local name=script_path:match("Mods/Packs/") and script_path:match("([^/]+)/[^/]+$") or script_path:match("[^/]+$")
+    return name and "Mods/Data/"..name.."/"
+end
+local function report_location(path)
+    local folder=data_folder()
+    return folder and folder..path or path.." (in this mod's data folder)"
+end
 
 -- Option registration takes both a short label and a long description. Keep
 -- the default as the final argument; otherwise Playlunky treats it as the
@@ -28,7 +42,7 @@ local function register_group(name, title)
     end)
 end
 register_group("a_randomizer_group","Randomizer")
-register_option_bool("b_enabled","Enable Key Item Randomizer","Enable or disable all Key Item Randomizer replacements.",saved_option("b_enabled",true,"a_enabled","enabled"))
+register_option_bool("b_enabled","Enable Shell Game","Enable or disable all Shell Game replacements.",saved_option("b_enabled",true,"a_enabled","enabled"))
 register_option_int("d_seed","Randomizer Seed (0 = new logic)","",saved_option("d_seed",0,"c_seed","b_seed","seed"),0,999999)
 register_group("e_balance_group","Balance")
 register_option_bool("f_kali_item_recovery","Kali Item Recovery","Restore held, equipped, and allowed altar-dropped items from the City of Gold to Duat.",saved_option("f_kali_item_recovery",true,"f_duat_item_recovery","d_duat_item_recovery","duat_item_recovery"))
@@ -38,11 +52,11 @@ local developer_options=build_config.developer_options==true
 if developer_options then
     register_group("i_logging_group","Logging")
     register_option_bool("j_generate_spoiler","Generate Spoiler","Include the full randomized check mapping in the per-run report.",saved_option("j_generate_spoiler",true,"i_generate_spoiler","i_run_reports","e_run_reports","run_reports"))
-    register_option_bool("k_generate_logs","Generate Logs","Include Key Item Randomizer logs in the same per-run report.",saved_option("k_generate_logs",true,"j_generate_logs","i_run_reports","e_run_reports","run_reports"))
+    register_option_bool("k_generate_logs","Generate Logs","Include Shell Game logs in the same per-run report.",saved_option("k_generate_logs",true,"j_generate_logs","i_run_reports","e_run_reports","run_reports"))
     register_group("m_developer_group","Developer")
     register_option_bool("n_dev_use_adventure_seed","Use Adventure Run Seed","Apply the seed pair below immediately before each new run starts.",saved_option("n_dev_use_adventure_seed",false))
     register_option_string("o_dev_adventure_seed","Adventure Run Seed","Two signed integers from a run report, in the form first,second.",saved_option("o_dev_adventure_seed",""))
-    register_option_bool("p_dev_in_game_logging","In-Game Logging","Show Key Item Randomizer runtime logs in the Playlunky overlay.",saved_option("p_dev_in_game_logging",build_config.default_overlay_runtime_logs==true))
+    register_option_bool("p_dev_in_game_logging","In-Game Logging","Show Shell Game runtime logs in the Playlunky overlay.",saved_option("p_dev_in_game_logging",build_config.default_overlay_runtime_logs==true))
     register_option_bool("q_dev_test_resources","Test: Start with resources and progression items","Give each player the test loadout used for check verification.",saved_option("q_dev_test_resources",true,"l_test_resources","k_test_resources","g_test_resources","f_test_resources","test_resources"))
     register_option_int("r_dev_beg_start_state","Beg Starting Quest State","Developer only. Apply this state to Beg's quest at the start of every run. Use 0 for normal behavior; use 3 to prepare the True Crown completion transition.",saved_option("r_dev_beg_start_state",0),0,5)
 end
@@ -236,7 +250,7 @@ set_callback(function()
     local generate_spoiler=not developer_options or options.j_generate_spoiler
     local generate_logs=not developer_options or options.k_generate_logs
     local report_path=logger.begin_run(randomizer_state,logic,generate_spoiler,generate_logs)
-    if report_path then log("Run report started: Mods/Data/KeyItemRandomizer/"..report_path)
+    if report_path then log("Run report started: "..report_location(report_path))
     elseif generate_spoiler or generate_logs then log("WARNING: could not create this run's report file") end
     log("Reset run-scoped randomizer state for new run")
     if developer_options and options.q_dev_test_resources then
@@ -329,7 +343,7 @@ register_console_command("kir_status",function()
 end)
 register_console_command("kir_report_path",function()
     local path=logger.report_path()
-    print(path and "[KIR] Current run report: Mods/Data/KeyItemRandomizer/"..path or "[KIR] No active run report (start a run or enable Write Run Reports).")
+    print(path and "[KIR] Current run report: "..report_location(path) or "[KIR] No active run report (start a run or enable Write Run Reports).")
     return path or false
 end)
 register_console_command("kir_where",function()
@@ -340,4 +354,4 @@ register_console_command("kir_where",function()
 end)
 register_console_command("kir_anchors",function() placements.print_missing_anchors(); return true end)
 register_console_command("kir_help",function() print("[KIR] kir_validate(seed), kir_fuzz(count, first), kir_seed(seed), kir_new_seed(), kir_spoiler(), kir_where(), kir_status(), kir_anchors() -- kir_status includes Sparrow quest state"); return true end)
-log("Key Item Randomizer logic v"..logic.LOGIC_VERSION.." loaded")
+log("Shell Game logic v"..logic.LOGIC_VERSION.." loaded")
