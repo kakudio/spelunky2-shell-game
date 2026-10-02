@@ -279,8 +279,8 @@ scenario("Excalibur's gate opens when a player holds a Hedjet, checked again at 
     game.checks.replace_excalibur_if_gated(game.ctx)
     expect(game:entity(sword.uid),"the sword was replaced before any player held a Crown or Hedjet")
     game:place("ITEM_PICKUP_HEDJET",{holder=game:add_player{x=1,y=1}})
-    game.checks.replace_excalibur_if_gated(game.ctx)
-    expect(not game:entity(sword.uid),"the sword was not replaced once a player held a Hedjet")
+    game:fire(ON.START)
+    expect(not game:entity(sword.uid),"the sword was not replaced at run start once a player held a Hedjet")
     expect_spawn(game,"ITEM_PICKUP_ANKH",31,44,LAYER.FRONT,"the mapped reward was not placed at the sword")
 end,{CHECK_EXCALIBUR_STONE="REWARD_ANKH"})
 
