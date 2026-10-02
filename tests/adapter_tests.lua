@@ -124,6 +124,224 @@ scenario("deferred adapter work from a previous level does nothing",function(gam
     expect(game:logged("Cancelled stale deferred action Humphead cave Idol retry"),"the stale retry was not cancelled")
 end,{CHECK_HUMPHEAD_CAVE_IDOL="REWARD_SKELETON_KEY"})
 
+local function expect_spawn(game,type_name,x,y,layer,message)
+    local spawns=game:spawned_of(type_name)
+    local spawn=spawns[1]
+    expect(#spawns==1 and spawn.x==x and spawn.y==y and spawn.layer==layer,
+        message.." (got "..#spawns.." "..type_name..(spawn and string.format(" first at %s, %s layer %s",spawn.x,spawn.y,spawn.layer) or "")..")")
+    return spawn
+end
+
+local function neo_babylon(game,level,entities)
+    return game:start_level{theme=THEME.NEO_BABYLON,world=6,level=level,entities=entities}
+end
+
+scenario("an item anchor replaces only its source in its theme, level and layer",function(game)
+    local placed=neo_babylon(game,3,{
+        {"ITEM_PICKUP_ROYALJELLY",x=12,y=40,layer=LAYER.BACK},
+        {"ITEM_PICKUP_ROYALJELLY",x=30,y=40,layer=LAYER.FRONT},
+    })
+    expect(not game:entity(placed[1].uid),"the back-layer Royal Jelly in Tusk's palace was not removed")
+    expect(game:entity(placed[2].uid),"a front-layer Royal Jelly was replaced")
+    local spawn=expect_spawn(game,"ITEM_PICKUP_SKELETON_KEY",12,40,LAYER.BACK,"the mapped reward was not spawned at the palace Royal Jelly")
+    expect(spawn.api=="spawn_entity_snapped_to_floor","the palace reward was not snapped to the floor")
+    expect(game:materialized("CHECK_TUSK_PALACE_VISIT"),"the palace check was not marked materialized")
+
+    local jelly=neo_babylon(game,2,{{"ITEM_PICKUP_ROYALJELLY",x=12,y=40,layer=LAYER.BACK}})[1]
+    expect(game:entity(jelly.uid),"a back-layer Royal Jelly on Neo Babylon 6-2 was replaced")
+    jelly=game:start_level{theme=THEME.JUNGLE,world=2,level=3,entities={{"ITEM_PICKUP_ROYALJELLY",x=12,y=40,layer=LAYER.BACK}}}[1]
+    expect(game:entity(jelly.uid),"a back-layer Royal Jelly in the Jungle was replaced")
+    expect(#game:spawned_of("ITEM_PICKUP_SKELETON_KEY")==1,"a reward was spawned outside the anchor's theme or level")
+end,{CHECK_TUSK_PALACE_VISIT="REWARD_SKELETON_KEY"})
+
+scenario("an item anchor replaces its source when the game spawns it after generation",function(game)
+    neo_babylon(game,2)
+    local wrong_level=game:native_spawn("ITEM_PICKUP_ROYALJELLY",{x=12,y=40,layer=LAYER.BACK})
+    expect(game:entity(wrong_level).type.id==game.ENT_TYPE.ITEM_PICKUP_ROYALJELLY,"a Royal Jelly spawned on 6-2 was replaced")
+
+    neo_babylon(game,3)
+    local front=game:native_spawn("ITEM_PICKUP_ROYALJELLY",{x=30,y=40,layer=LAYER.FRONT})
+    expect(game:entity(front).type.id==game.ENT_TYPE.ITEM_PICKUP_ROYALJELLY,"a front-layer Royal Jelly spawn was replaced")
+    local back=game:native_spawn("ITEM_PICKUP_ROYALJELLY",{x=12,y=40,layer=LAYER.BACK})
+    expect(game:entity(back).type.id==game.ENT_TYPE.ITEM_PICKUP_SKELETON_KEY,"the palace Royal Jelly spawn was not replaced by the mapped reward")
+    expect_spawn(game,"ITEM_PICKUP_SKELETON_KEY",12,40,LAYER.BACK,"the palace reward was not spawned in place of the Royal Jelly")
+    expect(game:materialized("CHECK_TUSK_PALACE_VISIT"),"the palace check was not marked materialized")
+end,{CHECK_TUSK_PALACE_VISIT="REWARD_SKELETON_KEY"})
+
+local function olmec_drop(game)
+    return game:entity(game:drop("OLMEC_SISTERS_BOMBBOX","ITEM_PICKUP_BOMBBOX",{x=5,y=5})).type.id
+end
+
+scenario("an engine drop is substituted only in its theme",function(game)
+    olmec(game)
+    expect(olmec_drop(game)==game.ENT_TYPE.ITEM_PICKUP_SKELETON_KEY,"the Sisters' Bomb Box drop was not substituted at Olmec")
+    expect(game:logged("Sisters Bomb Box drop configured: CHECK_SISTERS_OLMEC_REWARD -> REWARD_SKELETON_KEY"),"the substitution was not reported")
+
+    game:start_level{theme=THEME.TIDE_POOL,world=4,level=1}
+    expect(olmec_drop(game)==game.ENT_TYPE.ITEM_PICKUP_BOMBBOX,"the Sisters' substitution stayed armed outside Olmec")
+    local jelly=game:drop("QUEENBEE_ROYALJELLY","ITEM_PICKUP_ROYALJELLY",{x=5,y=5})
+    expect(game:entity(jelly).type.id==game.ENT_TYPE.ITEM_PICKUP_CROWN,"the theme-free Queen Bee substitution was disarmed outside the Jungle")
+end,{CHECK_SISTERS_OLMEC_REWARD="REWARD_SKELETON_KEY",CHECK_QUEEN_BEE="REWARD_CROWN"})
+
+scenario("a run-flagged engine drop is disarmed once its flag is set",function(game)
+    local function kapala() return game:entity(game:drop("ALTAR_KAPALA","ITEM_PICKUP_KAPALA",{x=5,y=5})).type.id end
+    game:start_level{theme=THEME.DWELLING,world=1,level=2}
+    expect(kapala()==game.ENT_TYPE.ITEM_PICKUP_ANKH,"the Kapala drop was not substituted before its flag was set")
+    game.ctx.kali_second_gift_completed=true
+    game:start_level{theme=THEME.DWELLING,world=1,level=3}
+    expect(kapala()==game.ENT_TYPE.ITEM_PICKUP_KAPALA,"the Kapala substitution stayed armed after its run flag was set")
+end,{CHECK_KALI_ALTAR_2="REWARD_ANKH"})
+
+local function quillback_level(game)
+    return game:start_level{theme=THEME.DWELLING,world=1,level=4,entities={{"MONS_CAVEMAN_BOSS",x=10,y=20}}}[1]
+end
+
+scenario("a boss's native death drop is replaced once, and the fallback does not add another",function(game)
+    local boss=quillback_level(game)
+    boss.x,boss.y=14,22
+    boss:kill()
+    local reward=game:native_spawn("ITEM_PICKUP_BOMBBAG",{x=14,y=21})
+    expect(game:entity(reward).type.id==game.ENT_TYPE.ITEM_PICKUP_ANKH,"Quillback's native Bomb Bag was not replaced")
+    game:frames(10)
+    expect(#game:spawned_of("ITEM_PICKUP_ANKH")==1,"the fallback delivered a second reward after the native drop")
+    expect(#game:spawned_of("ITEM_PICKUP_BOMBBAG")==0 and #get_entities_by_type(game.ENT_TYPE.ITEM_PICKUP_BOMBBAG)==0,"a native Bomb Bag remains beside the reward")
+    expect(game:materialized("CHECK_QUILLBACK"),"the check was not marked materialized")
+end,{CHECK_QUILLBACK="REWARD_ANKH"})
+
+scenario("a boss reward falls back to the boss's last position when no native drop appears",function(game)
+    local boss=quillback_level(game)
+    boss.x,boss.y=14,22
+    boss:kill()
+    game:frames(1)
+    expect(#game:spawned_of("ITEM_PICKUP_ANKH")==0,"the fallback fired before the native drop could arrive")
+    game:frames(10)
+    expect_spawn(game,"ITEM_PICKUP_ANKH",14,22,LAYER.FRONT,"the fallback reward was not placed at Quillback's last position")
+    expect(game:materialized("CHECK_QUILLBACK"),"the check was not marked materialized")
+    local late=game:native_spawn("ITEM_PICKUP_BOMBBAG",{x=14,y=21})
+    expect(game:entity(late).type.id==game.ENT_TYPE.ITEM_PICKUP_BOMBBAG,"a Bomb Bag after the fallback was replaced again")
+    expect(#game:spawned_of("ITEM_PICKUP_ANKH")==1,"the reward was delivered twice")
+end,{CHECK_QUILLBACK="REWARD_ANKH"})
+
+local function yang_level(game,entities)
+    table.insert(entities,1,{"MONS_YANG",x=20,y=30})
+    return game:start_level{theme=THEME.DWELLING,world=1,level=2,entities=entities}
+end
+
+scenario("Yang's reward is anchored beside the locked-pen door nearest him horizontally",function(game)
+    yang_level(game,{
+        {"FLOOR_DOOR_LOCKED_PEN",x=23,y=30},
+        {"FLOOR_DOOR_LOCKED_PEN",x=18,y=12},
+    })
+    local spawn=expect_spawn(game,"ITEM_PICKUP_ANKH",17,12,LAYER.BACK,"Yang's reward is not beside the horizontally nearest locked-pen door")
+    expect(spawn.api=="spawn_entity_snapped_to_floor","Yang's reward was not snapped to the floor")
+    expect(game:materialized("CHECK_YANG"),"the Yang check was not marked materialized")
+end,{CHECK_YANG="REWARD_ANKH"})
+
+-- Regression for 283ea67 and 1312e60: Yang's pen is not always five rows
+-- below him, and generic doors on that row are not his reward door.
+scenario("Yang's reward follows his locked-pen door, not the doors on the row five below him",function(game)
+    yang_level(game,{
+        {"FLOOR_DOOR_LAYER",x=21,y=25},
+        {"BG_DOOR_BACK_LAYER",x=21,y=25,layer=LAYER.BACK},
+        {"FLOOR_DOOR_LOCKED",x=19,y=25},
+        {"FLOOR_DOOR_LOCKED_PEN",x=26,y=23},
+    })
+    expect_spawn(game,"ITEM_PICKUP_ANKH",27,23,LAYER.BACK,"Yang's reward is not beside his locked-pen door")
+end,{CHECK_YANG="REWARD_ANKH"})
+
+-- Regression for 61a51c6: without the pen, Yang's own position is not a
+-- safe anchor, so the check is left unplaced.
+scenario("Yang's check is not placed without a locked-pen door, and the failure is logged",function(game)
+    yang_level(game,{{"FLOOR_DOOR_LAYER",x=21,y=25}})
+    expect(#game.spawned==0,"a Yang reward was placed without a locked-pen door")
+    expect(not game:materialized("CHECK_YANG"),"the Yang check was marked materialized")
+    expect(game:logged("Yang reward anchor found no native locked-pen door; Yang check was not placed"),"the missing anchor was not logged")
+    expect(game:logged("Yang anchor diagnostic FLOOR_DOOR_LAYER"),"the nearby doors were not reported")
+end,{CHECK_YANG="REWARD_ANKH"})
+
+local function excalibur_level(game,level,entities)
+    return game:start_level{theme=THEME.TIDE_POOL,world=4,level=level or 2,entities=entities or {{"ITEM_EXCALIBUR",x=0.5,y=1,abs_x=31,abs_y=44}}}
+end
+
+-- Regression for 1fa7a93: a Crown the mod did not place opens the gate.
+scenario("Excalibur's gate opens when a player holds a Crown",function(game)
+    local player=game:add_player{x=1,y=1}
+    game:place("ITEM_PICKUP_CROWN",{holder=player})
+    local sword=excalibur_level(game)[1]
+    game:frames(10)
+    expect(not game:entity(sword.uid),"the sword-in-stone was not removed")
+    expect_spawn(game,"ITEM_PICKUP_ANKH",31,44,LAYER.FRONT,"the mapped reward was not placed at the sword's absolute position")
+    expect(game:materialized("CHECK_EXCALIBUR_STONE"),"the Excalibur check was not marked materialized")
+end,{CHECK_EXCALIBUR_STONE="REWARD_ANKH"})
+
+scenario("Excalibur's gate opens when a player holds a Hedjet, checked again at the start of a run",function(game)
+    local sword=excalibur_level(game)[1]
+    game.checks.replace_excalibur_if_gated(game.ctx)
+    expect(game:entity(sword.uid),"the sword was replaced before any player held a Crown or Hedjet")
+    game:place("ITEM_PICKUP_HEDJET",{holder=game:add_player{x=1,y=1}})
+    game.checks.replace_excalibur_if_gated(game.ctx)
+    expect(not game:entity(sword.uid),"the sword was not replaced once a player held a Hedjet")
+    expect_spawn(game,"ITEM_PICKUP_ANKH",31,44,LAYER.FRONT,"the mapped reward was not placed at the sword")
+end,{CHECK_EXCALIBUR_STONE="REWARD_ANKH"})
+
+scenario("Excalibur's gate stays closed unless a player's inventory holds a Crown or Hedjet",function(game)
+    game:place("ITEM_PICKUP_ANKH",{holder=game:add_player{x=1,y=1}})
+    local sword=excalibur_level(game,2,{
+        {"ITEM_EXCALIBUR",x=0.5,y=1,abs_x=31,abs_y=44},
+        {"ITEM_PICKUP_CROWN",x=8,y=8},
+        {"ITEM_PICKUP_HEDJET",x=9,y=8},
+    })[1]
+    game:frames(200)
+    expect(game:entity(sword.uid) and #game.spawned==0,"the sword was replaced with no Crown or Hedjet in a player's inventory")
+    expect(game:logged("Excalibur gate is closed: no player holds a Crown or Hedjet"),"the closed gate was not reported")
+end,{CHECK_EXCALIBUR_STONE="REWARD_ANKH"})
+
+scenario("Excalibur does nothing outside Tide Pool 4-2",function(game)
+    game:place("ITEM_PICKUP_CROWN",{holder=game:add_player{x=1,y=1}})
+    for _,level in ipairs({1,3}) do
+        local sword=excalibur_level(game,level)[1]
+        game:frames(200)
+        game.checks.replace_excalibur_if_gated(game.ctx)
+        expect(game:entity(sword.uid),"a sword on Tide Pool 4-"..level.." was replaced")
+    end
+    expect(#game.spawned==0 and not game:logged("Excalibur gate"),"Excalibur ran outside Tide Pool 4-2")
+end,{CHECK_EXCALIBUR_STONE="REWARD_ANKH"})
+
+scenario("Excalibur leaves a carried sword alone and replaces the sword-in-stone",function(game)
+    local player=game:add_player{x=1,y=1}
+    game:place("ITEM_PICKUP_CROWN",{holder=player})
+    local carried=game:place("ITEM_EXCALIBUR",{holder=player})
+    local stone=excalibur_level(game)[1]
+    game:frames(10)
+    expect(game:entity(carried.uid) and carried.holder==player,"the carried sword was replaced")
+    expect(game:logged("Ignored player_carried source uid "..carried.uid),"the carried sword was not reported")
+    expect(not game:entity(stone.uid),"the sword-in-stone beside a carried sword was not replaced")
+    expect_spawn(game,"ITEM_PICKUP_ANKH",31,44,LAYER.FRONT,"the mapped reward was not placed at the sword-in-stone")
+end,{CHECK_EXCALIBUR_STONE="REWARD_ANKH"})
+
+scenario("Excalibur retries until the sword-in-stone spawns",function(game)
+    game:place("ITEM_PICKUP_CROWN",{holder=game:add_player{x=1,y=1}})
+    excalibur_level(game,2,{})
+    game:frames(30)
+    expect(game:logged("Excalibur gate is open, but the sword has not spawned yet; retrying"),"the missing sword was not reported")
+    local sword=game:place("ITEM_EXCALIBUR",{x=0.5,y=1,abs_x=31,abs_y=44})
+    game:frames(5)
+    expect(not game:entity(sword.uid),"a late sword-in-stone was not replaced by a retry")
+    expect_spawn(game,"ITEM_PICKUP_ANKH",31,44,LAYER.FRONT,"the retry did not place the mapped reward at the sword")
+end,{CHECK_EXCALIBUR_STONE="REWARD_ANKH"})
+
+scenario("Excalibur fails its check once its retries are exhausted",function(game)
+    game:place("ITEM_PICKUP_CROWN",{holder=game:add_player{x=1,y=1}})
+    excalibur_level(game,2,{})
+    game:frames(150)
+    expect(not game.ctx.lifecycle.failures.CHECK_EXCALIBUR_STONE,"the check failed before its retries were exhausted")
+    game:frames(20)
+    expect(game.ctx.lifecycle.failures.CHECK_EXCALIBUR_STONE,"the check did not fail after its retries were exhausted")
+    expect(game:logged("CHECK CHECK_EXCALIBUR_STONE failed: gate was open but no native sword-in-stone appeared after retries"),"the failure was not logged")
+    expect(#game.timeouts==0,"Excalibur kept retrying after failing")
+    expect(#game.spawned==0,"a reward was spawned without a sword")
+end,{CHECK_EXCALIBUR_STONE="REWARD_ANKH"})
+
 function M.run()
     local failures={}
     for _,entry in ipairs(scenarios) do
