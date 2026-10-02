@@ -9,6 +9,7 @@ end
 
 local suites={
     {name="logic",run=function() return require("tests").run(fuzz_count) end},
+    {name="adapters",run=function() return require("tests.adapter_tests").run() end},
 }
 
 print(_VERSION)
