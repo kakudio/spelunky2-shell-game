@@ -158,6 +158,17 @@ lua5.4 scripts/run_tests.lua
 
 It fuzzes 1,000 seeds by default (pass a different count as the first argument), prints which test and seed failed, and exits non-zero on failure. Every pull request and push to `main` runs this same command in the `tests` check.
 
+The same command runs the `adapters` suite: scenarios in `tests/adapter_tests.lua` that load the shipped adapter modules against a stand-in for the game (`tests/stand_in.lua`). The stand-in records spawns, destroys and callbacks; nothing happens unless a scenario fires it. The in-game `kir_tests` command runs only the logic suite.
+
+To add a scenario for a check:
+
+1. Add `scenario("what the player sees", function(game) ... end, {CHECK_ID="REWARD_ID"})` to `tests/adapter_tests.lua`. The mapping is fixed for that scenario, and each scenario starts with freshly loaded mod modules.
+2. Set up the level with `game:start_level{theme=THEME.X, world=w, level=l, entities={{"ENT_NAME", x=..., y=..., layer=...}}}`. It runs the same pre/post level-generation sequence as `main.lua`. Entity fields are free-form, so stage whatever the adapter reads (`abs_x`, `inside`, `health`, `set_pre_destroy`...). Use `game:add_player{...}` and `game:place("ENT_NAME", {holder=player})` for inventory.
+3. Fire what the game would: `game:native_spawn("ENT_NAME", {...})` for a spawn, `game:drop("DROP_NAME", "NATIVE_ENT_NAME", {...})` for an engine drop, `game:kill(entity)` for a boss death, and `game:frames(n)` to run `ON.FRAME` and deferred work.
+4. Assert on `game:spawned_of("ENT_NAME")`, `game:entity(uid)` (nil once destroyed), `game.destroyed`, `game:materialized("CHECK_ID")` and `game:logged("text")`.
+
+A pull request that adds or changes a check's adapter includes a stand-in scenario for that check, alongside the in-game verification [`docs/verified-checks.md`](docs/verified-checks.md) requires.
+
 ## Releasing
 
 GitHub automatically packages the mod and publishes its zip when a version tag is pushed. Update `mod.json` first, commit it, then create and push a matching tag:
