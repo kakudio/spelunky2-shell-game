@@ -264,9 +264,8 @@ local function excalibur_level(game,level,entities)
 end
 
 -- Regression for 1fa7a93: a Crown the mod did not place opens the gate.
-scenario("Excalibur's gate opens when a player holds a Crown",function(game)
-    local player=game:add_player{x=1,y=1}
-    game:place("ITEM_PICKUP_CROWN",{holder=player})
+scenario("Excalibur's gate opens when a player wears a Crown",function(game)
+    game:wear(game:add_player{x=1,y=1},"ITEM_POWERUP_CROWN")
     local sword=excalibur_level(game)[1]
     game:frames(10)
     expect(not game:entity(sword.uid),"the sword-in-stone was not removed")
@@ -274,17 +273,30 @@ scenario("Excalibur's gate opens when a player holds a Crown",function(game)
     expect(game:materialized("CHECK_EXCALIBUR_STONE"),"the Excalibur check was not marked materialized")
 end,{CHECK_EXCALIBUR_STONE="REWARD_ANKH"})
 
-scenario("Excalibur's gate opens when a player holds a Hedjet, checked again at the start of a run",function(game)
+scenario("Excalibur's gate opens when a player wears a Hedjet, checked again at the start of a run",function(game)
     local sword=excalibur_level(game)[1]
     game.checks.replace_excalibur_if_gated(game.ctx)
-    expect(game:entity(sword.uid),"the sword was replaced before any player held a Crown or Hedjet")
-    game:place("ITEM_PICKUP_HEDJET",{holder=game:add_player{x=1,y=1}})
+    expect(game:entity(sword.uid),"the sword was replaced before any player wore a Crown or Hedjet")
+    game:wear(game:add_player{x=1,y=1},"ITEM_POWERUP_HEDJET")
     game:fire(ON.START)
-    expect(not game:entity(sword.uid),"the sword was not replaced at run start once a player held a Hedjet")
+    expect(not game:entity(sword.uid),"the sword was not replaced at run start once a player wore a Hedjet")
     expect_spawn(game,"ITEM_PICKUP_ANKH",31,44,LAYER.FRONT,"the mapped reward was not placed at the sword")
 end,{CHECK_EXCALIBUR_STONE="REWARD_ANKH"})
 
-scenario("Excalibur's gate stays closed unless a player's inventory holds a Crown or Hedjet",function(game)
+scenario("Excalibur's gate opens once a player first wears a Hedjet partway through Tide Pool 4-2",function(game)
+    local player=game:add_player{x=1,y=1}
+    local sword=excalibur_level(game)[1]
+    game:frames(60)
+    expect(game:entity(sword.uid),"the sword was replaced before any player wore a Crown or Hedjet")
+    game:wear(player,"ITEM_POWERUP_HEDJET")
+    game:frames(1)
+    expect(not game:entity(sword.uid),"the sword was not replaced once a player wore a Hedjet in 4-2")
+    expect_spawn(game,"ITEM_PICKUP_ANKH",31,44,LAYER.FRONT,"the mapped reward was not placed at the sword")
+    game:frames(60)
+    expect(#game.spawned==1,"the check materialized more than once")
+end,{CHECK_EXCALIBUR_STONE="REWARD_ANKH"})
+
+scenario("Excalibur's gate stays closed unless a player wears a Crown or Hedjet",function(game)
     game:place("ITEM_PICKUP_ANKH",{holder=game:add_player{x=1,y=1}})
     local sword=excalibur_level(game,2,{
         {"ITEM_EXCALIBUR",x=0.5,y=1,abs_x=31,abs_y=44},
@@ -292,12 +304,12 @@ scenario("Excalibur's gate stays closed unless a player's inventory holds a Crow
         {"ITEM_PICKUP_HEDJET",x=9,y=8},
     })[1]
     game:frames(200)
-    expect(game:entity(sword.uid) and #game.spawned==0,"the sword was replaced with no Crown or Hedjet in a player's inventory")
-    expect(game:logged("Excalibur gate is closed: no player holds a Crown or Hedjet"),"the closed gate was not reported")
+    expect(game:entity(sword.uid) and #game.spawned==0,"the sword was replaced with no Crown or Hedjet worn")
+    expect(game:logged("Excalibur gate is closed: no player wears a Crown or Hedjet"),"the closed gate was not reported")
 end,{CHECK_EXCALIBUR_STONE="REWARD_ANKH"})
 
 scenario("Excalibur does nothing outside Tide Pool 4-2",function(game)
-    game:place("ITEM_PICKUP_CROWN",{holder=game:add_player{x=1,y=1}})
+    game:wear(game:add_player{x=1,y=1},"ITEM_POWERUP_CROWN")
     for _,level in ipairs({1,3}) do
         local sword=excalibur_level(game,level)[1]
         game:frames(200)
@@ -309,7 +321,7 @@ end,{CHECK_EXCALIBUR_STONE="REWARD_ANKH"})
 
 scenario("Excalibur leaves a carried sword alone and replaces the sword-in-stone",function(game)
     local player=game:add_player{x=1,y=1}
-    game:place("ITEM_PICKUP_CROWN",{holder=player})
+    game:wear(player,"ITEM_POWERUP_CROWN")
     local carried=game:place("ITEM_EXCALIBUR",{holder=player})
     local stone=excalibur_level(game)[1]
     game:frames(10)
@@ -320,7 +332,7 @@ scenario("Excalibur leaves a carried sword alone and replaces the sword-in-stone
 end,{CHECK_EXCALIBUR_STONE="REWARD_ANKH"})
 
 scenario("Excalibur retries until the sword-in-stone spawns",function(game)
-    game:place("ITEM_PICKUP_CROWN",{holder=game:add_player{x=1,y=1}})
+    game:wear(game:add_player{x=1,y=1},"ITEM_POWERUP_CROWN")
     excalibur_level(game,2,{})
     game:frames(30)
     expect(game:logged("Excalibur gate is open, but the sword has not spawned yet; retrying"),"the missing sword was not reported")
@@ -331,7 +343,7 @@ scenario("Excalibur retries until the sword-in-stone spawns",function(game)
 end,{CHECK_EXCALIBUR_STONE="REWARD_ANKH"})
 
 scenario("Excalibur fails its check once its retries are exhausted",function(game)
-    game:place("ITEM_PICKUP_CROWN",{holder=game:add_player{x=1,y=1}})
+    game:wear(game:add_player{x=1,y=1},"ITEM_POWERUP_CROWN")
     excalibur_level(game,2,{})
     game:frames(150)
     expect(not game.ctx.lifecycle.failures.CHECK_EXCALIBUR_STONE,"the check failed before its retries were exhausted")

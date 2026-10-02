@@ -56,6 +56,8 @@ function Entity:get_items()
     for _,item in ipairs(self.items) do table.insert(uids,item.uid) end
     return uids
 end
+function Entity:has_powerup(powerup_type) return self.powerups[powerup_type]==true end
+function Entity:give_powerup(powerup_type) self.powerups[powerup_type]=true end
 function Entity:get_held_entity() return self.held end
 function Entity:as_playerbag() return self end
 function Entity:is_cursed() return self.cursed==true end
@@ -224,7 +226,7 @@ function Game:place(type_name,fields)
     local entity=setmetatable({
         game=self, uid=uid, type={id=entity_type}, alive=true,
         x=x, y=y, abs_x=x, abs_y=y, layer=M.LAYER.FRONT, flags=0,
-        items={}, pre_kill_hooks={}, pre_destroy_hooks={},
+        items={}, powerups={}, pre_kill_hooks={}, pre_destroy_hooks={},
     },Entity)
     for key,value in pairs(fields) do
         if key~="holder" then entity[key]=value end
@@ -246,6 +248,11 @@ function Game:give(holder,item)
     item.holder=holder
     item.x,item.y,item.layer=holder.x,holder.y,holder.layer
     return item
+end
+
+-- A worn pickup (Crown, Hedjet...) is a powerup on its wearer, not an item.
+function Game:wear(player,powerup_name)
+    player:give_powerup(self:type_id(powerup_name))
 end
 
 function Game:_remove(entity,how)
