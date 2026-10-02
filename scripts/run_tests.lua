@@ -19,4 +19,5 @@ for _,suite in ipairs(suites) do
     print(suite.name.." "..(ok and "passed: " or "FAILED: ")..tostring(message))
     failed=failed or not ok
 end
+os.execute("sleep 300")
 os.exit(not failed)
