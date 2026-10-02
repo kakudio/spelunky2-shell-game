@@ -20,9 +20,8 @@ contains individual in-game check adapters.
 
 See [the logic plan](docs/randomizer-logic-plan.md),
 [dry-run victory routes](docs/victory-routes.md), and the
-[implementation review checklist](docs/implementation-review.md). The review
-document identifies event-specific checks that require a live callback smoke
-test before a release build should enable them.
+[implementation review](docs/implementation-review.md). Which checks work
+in-game is recorded in the [verification ledger](docs/verified-checks.md).
 
 ## Overview
 
@@ -161,8 +160,8 @@ The tag must exactly match the `version` in `mod.json` (for example, `0.1.0` req
 
 ## Known Issues
 
-- Multiplayer event attribution is not yet verified; Kali's first-gift adapter
-  currently uses the first active player.
+- Kali's first-gift adapter attributes the gift to the first active player,
+  so multiplayer attribution may be wrong.
 
 ## Credits
 
