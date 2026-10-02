@@ -19,4 +19,4 @@ for _,suite in ipairs(suites) do
     print(suite.name.." "..(ok and "passed: " or "FAILED: ")..tostring(message))
     failed=failed or not ok
 end
-os.exit(not failed)
+os.exit(false)
