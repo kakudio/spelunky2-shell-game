@@ -14,64 +14,65 @@ results.
 - `kir_fuzz(1000, 1)` and `kir_validate(seed)` remain required after every
   logic change.
 
-Results come from the final pass in the
-[runtime verification checklist](runtime-verification-checklist.md#final-pass).
-Each result is one of **verified**, **failed**, or **not reached**, with the
-date of the run and the tester's note. **Pending** means the check has no
-result on the current adapters.
+Each row is either **verified** or **not yet verified**. Statuses come from
+the final pass in the
+[runtime verification checklist](runtime-verification-checklist.md#final-pass):
+exactly the rows the tester ticked on the pull request are verified, with the
+session date and the row's expected result as what was observed. Every other
+row is not yet verified.
 
 Adapters changed after the previous in-game pass (2026-08-04), so none of its
 observations are carried forward.
 
 ## Checks
 
-| Check | Result | Run date | Note |
+| Check | Status | Verified on | Observed |
 |---|---|---|---|
-| `CHECK_UDJAT_CHEST` | Pending | | |
-| `CHECK_YANG` | Pending | | |
-| `CHECK_QUILLBACK` | Pending | | |
-| `CHECK_BLACK_MARKET` | Pending | | |
-| `CHECK_QUEEN_BEE` | Pending | | |
-| `CHECK_SISTERS_OLMEC_REWARD` | Pending | | |
-| `CHECK_VAN_HORSING_RESCUE` | Pending | | |
-| `CHECK_VLADS_CASTLE` | Pending | | |
-| `CHECK_VLAD` | Pending | | |
-| `CHECK_MOON_CHALLENGE_JUNGLE` | Pending | | |
-| `CHECK_MOON_CHALLENGE_VOLCANA` | Pending | | |
-| `CHECK_OLMEC_ANKH` | Pending | | |
-| `CHECK_KALI_ALTAR_1` | Pending | | |
-| `CHECK_KALI_PRESENT` | Pending | | |
-| `CHECK_BEG_FIRST_MEETING` | Pending | | |
-| `CHECK_SPARROW` | Pending | | |
-| `CHECK_TUSK_DICE_HOUSE` | Pending | | |
-| `CHECK_HUMPHEAD_CAVE_IDOL` | Pending | | |
-| `CHECK_EXCALIBUR_STONE` | Pending | | |
-| `CHECK_TUSK_IDOL` | Pending | | |
-| `CHECK_ANUBIS_SCEPTER` | Pending | | |
-| `CHECK_ALIEN_COMPASS` | Pending | | |
-| `CHECK_STARS_CHALLENGE_TIDE_POOL` | Pending | | |
-| `CHECK_STARS_CHALLENGE_TEMPLE` | Pending | | |
-| `CHECK_HUMPHEAD` | Pending | | |
-| `CHECK_YETI_QUEEN` | Pending | | |
-| `CHECK_YETI_KING` | Pending | | |
-| `CHECK_KINGU` | Pending | | |
-| `CHECK_OSIRIS` | Pending | | |
-| `CHECK_ANUBIS_II` | Pending | | |
-| `CHECK_LAHAMU` | Pending | | |
-| `CHECK_MOTHERSHIP_PLASMA_CANNON` | Pending | | |
-| `CHECK_TUSK_PALACE_VISIT` | Pending | | |
-| `CHECK_SPARROW_VAULT` | Pending | | |
-| `CHECK_KALI_ALTAR_2` | Pending | | |
-| `CHECK_BEG_TRUE_CROWN` | Pending | | |
-| `CHECK_TIAMAT` | Pending | | |
-| `CHECK_SUN_CHALLENGE` | Pending | | |
-| `CHECK_SUN_CHALLENGE_SUPPLIES` | Pending | | |
-| `CHECK_EGGPLANT_KING` | Pending | | |
+| `CHECK_UDJAT_CHEST` | Not yet verified | | |
+| `CHECK_YANG` | Not yet verified | | |
+| `CHECK_QUILLBACK` | Not yet verified | | |
+| `CHECK_BLACK_MARKET` | Not yet verified | | |
+| `CHECK_QUEEN_BEE` | Not yet verified | | |
+| `CHECK_SISTERS_OLMEC_REWARD` | Not yet verified | | |
+| `CHECK_VAN_HORSING_RESCUE` | Not yet verified | | |
+| `CHECK_VLADS_CASTLE` | Not yet verified | | |
+| `CHECK_VLAD` | Not yet verified | | |
+| `CHECK_MOON_CHALLENGE_JUNGLE` | Not yet verified | | |
+| `CHECK_MOON_CHALLENGE_VOLCANA` | Not yet verified | | |
+| `CHECK_OLMEC_ANKH` | Not yet verified | | |
+| `CHECK_KALI_ALTAR_1` | Not yet verified | | |
+| `CHECK_KALI_PRESENT` | Not yet verified | | |
+| `CHECK_BEG_FIRST_MEETING` | Not yet verified | | |
+| `CHECK_SPARROW` | Not yet verified | | |
+| `CHECK_TUSK_DICE_HOUSE` | Not yet verified | | |
+| `CHECK_HUMPHEAD_CAVE_IDOL` | Not yet verified | | |
+| `CHECK_EXCALIBUR_STONE` | Not yet verified | | |
+| `CHECK_TUSK_IDOL` | Not yet verified | | |
+| `CHECK_ANUBIS_SCEPTER` | Not yet verified | | |
+| `CHECK_ALIEN_COMPASS` | Not yet verified | | |
+| `CHECK_STARS_CHALLENGE_TIDE_POOL` | Not yet verified | | |
+| `CHECK_STARS_CHALLENGE_TEMPLE` | Not yet verified | | |
+| `CHECK_HUMPHEAD` | Not yet verified | | |
+| `CHECK_YETI_QUEEN` | Not yet verified | | |
+| `CHECK_YETI_KING` | Not yet verified | | |
+| `CHECK_KINGU` | Not yet verified | | |
+| `CHECK_OSIRIS` | Not yet verified | | |
+| `CHECK_ANUBIS_II` | Not yet verified | | |
+| `CHECK_LAHAMU` | Not yet verified | | |
+| `CHECK_MOTHERSHIP_PLASMA_CANNON` | Not yet verified | | |
+| `CHECK_TUSK_PALACE_VISIT` | Not yet verified | | |
+| `CHECK_SPARROW_VAULT` | Not yet verified | | |
+| `CHECK_KALI_ALTAR_2` | Not yet verified | | |
+| `CHECK_BEG_TRUE_CROWN` | Not yet verified | | |
+| `CHECK_TIAMAT` | Not yet verified | | |
+| `CHECK_SUN_CHALLENGE` | Not yet verified | | |
+| `CHECK_SUN_CHALLENGE_SUPPLIES` | Not yet verified | | |
+| `CHECK_EGGPLANT_KING` | Not yet verified | | |
 
 ## Run-level items
 
-| Item | Result | Run date | Note |
+| Item | Status | Verified on | Observed |
 |---|---|---|---|
-| `RUN_SAVE_RELOAD` | Pending | | |
-| `RUN_DUAT_ALTAR_COPIES` | Pending | | |
-| `RUN_TRUE_CROWN_RECOVERY` | Pending | | |
+| `RUN_SAVE_RELOAD` | Not yet verified | | |
+| `RUN_DUAT_ALTAR_COPIES` | Not yet verified | | |
+| `RUN_TRUE_CROWN_RECOVERY` | Not yet verified | | |
