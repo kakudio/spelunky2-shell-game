@@ -534,6 +534,29 @@ scenario("Kali's first altar check is still awarded after the Present",function(
     expect(not game:entity(gift) and #game:spawned_of("ITEM_JETPACK")==1,"the first altar check was not awarded after the Present")
 end,{CHECK_KALI_PRESENT="REWARD_CLONE_GUN",CHECK_KALI_ALTAR_1="REWARD_JETPACK"})
 
+local function dice_house(game)
+    tide_pool(game,1)
+    return game:dice_house{x=20,y=30,layer=LAYER.FRONT}
+end
+
+-- Regression for 9cb9c23: keyed to a count of five, the fifth prize stayed
+-- vanilla and the item staged after it became the reward.
+scenario("Tusk's Dice House pays four vanilla prizes and the mapped reward fifth",function(game)
+    local player=game:add_player{x=1,y=1}
+    dice_house(game)
+    local won={}
+    for n=1,5 do won[n]=game:win_dice_prize(player) end
+    for n=1,4 do
+        expect(won[n].type.id==game.dice_prizes[n].native,"prize "..n.." was not its vanilla item")
+    end
+    expect(won[5].type.id==game.ENT_TYPE.ITEM_PICKUP_SPECIALCOMPASS,"the fifth prize was not the mapped reward")
+    expect(game.dice_prizes[5].count==4,"the fifth prize was not staged at a count of four")
+    expect(#game:spawned_of("ITEM_PICKUP_SPECIALCOMPASS")==1,"the mapped reward was spawned more than once")
+    expect(game:materialized("CHECK_TUSK_DICE_HOUSE"),"the Dice House check was not marked materialized")
+    local after=game:entity(game.dice_prizes[6].uid)
+    expect(after and after.type.id==game.dice_prizes[6].native,"the item staged after the fifth prize was replaced")
+end,{CHECK_TUSK_DICE_HOUSE="REWARD_ALIEN_COMPASS"})
+
 function M.run()
     local failures={}
     for _,entry in ipairs(scenarios) do

@@ -419,4 +419,40 @@ function Game:logged(pattern)
     return false
 end
 
+-- Tusk's Dice House as the game runs it: a prize is staged behind the
+-- forcefield before it is won, and the next is staged once the player takes
+-- it. A win advances won_prizes_count, so prize n spawns at count n-1. The
+-- dispenser generates six prizes; the run in #22 shows it still emits an
+-- item after the fifth is taken, at count five, so the sixth is staged too.
+local DICE_PRIZES={
+    "ITEM_PICKUP_BOMBBAG", "ITEM_PICKUP_ROPEPILE", "ITEM_PICKUP_PARACHUTE",
+    "ITEM_PICKUP_SPECTACLES", "ITEM_PICKUP_CLIMBINGGLOVES", "ITEM_PICKUP_PITCHERSMITT",
+}
+
+function Game:dice_house(fields)
+    local dispenser=self:place("ITEM_DICE_PRIZE_DISPENSER",fields)
+    self.state.logic.diceshop={prize_dispenser=dispenser.uid,won_prizes_count=0,prize=-1}
+    self.dice_prizes={}
+    self:_stage_dice_prize()
+    return dispenser
+end
+
+function Game:_stage_dice_prize()
+    local dice=self.state.logic.diceshop
+    local dispenser=self:entity(dice.prize_dispenser)
+    local native=DICE_PRIZES[#self.dice_prizes+1]
+    dice.prize=self:native_spawn(native,{x=dispenser.x,y=dispenser.y+1,layer=dispenser.layer})
+    table.insert(self.dice_prizes,{uid=dice.prize,native=self:type_id(native),count=dice.won_prizes_count})
+end
+
+-- Rolls a seven, then the player takes the prize it opened.
+function Game:win_dice_prize(player)
+    local dice=self.state.logic.diceshop
+    dice.won_prizes_count=dice.won_prizes_count+1
+    local prize=self:entity(dice.prize)
+    self:give(player,prize)
+    self:_stage_dice_prize()
+    return prize
+end
+
 return M
