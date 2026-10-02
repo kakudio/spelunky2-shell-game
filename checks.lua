@@ -505,7 +505,7 @@ local function place_kali_present_source(ctx)
 end
 local function player_owned(item)
     for _,player in ipairs(players or {}) do
-        if item.last_owner_uid==player.uid or item.overlay==player then return true end
+        if item.last_owner_uid==player.uid or (item.overlay and item.overlay.uid==player.uid) then return true end
     end
     return false
 end
