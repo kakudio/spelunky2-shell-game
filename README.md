@@ -148,6 +148,16 @@ To modify the mod:
 2. Run `powershell -ExecutionPolicy Bypass -File .\scripts\package.ps1` to create `dist/Spelunky2-ShellGame-vX.Y.Z.zip` and `dist/Spelunky2-ShellGame-vX.Y.Z-dev.zip`, each holding a single `ShellGame` folder.
 3. Reload scripts in Overlunky (Ctrl+F5) or restart game, then check the console (`~`) for logs.
 
+### Running the tests
+
+The logic suite runs outside the game and needs Lua 5.4 (use `lua` in place of `lua5.4` if that is how your install names it). From the repository root:
+
+```sh
+lua5.4 scripts/run_tests.lua
+```
+
+It fuzzes 1,000 seeds by default (pass a different count as the first argument), prints which test and seed failed, and exits non-zero on failure. Every pull request and push to `main` runs this same command in the `tests` check.
+
 ## Releasing
 
 GitHub automatically packages the mod and publishes its zip when a version tag is pushed. Update `mod.json` first, commit it, then create and push a matching tag:
