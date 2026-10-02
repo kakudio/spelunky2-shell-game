@@ -47,7 +47,10 @@ function M.materialize(ctx, check, x, y, layer, source_uid, snap, safe_delivery)
         spawned_uid=placements.materialize(ctx.randomizer_state,ctx.log,check,x,y,layer,source_uid,snap)
     end
     ctx.materializing=false
-    if spawned_uid then ctx.lifecycle:mark(check,"materialized") end
+    if spawned_uid then
+        ctx.placed_rewards[spawned_uid]=true
+        ctx.lifecycle:mark(check,"materialized")
+    end
     return spawned_uid
 end
 
@@ -62,7 +65,10 @@ function M.replace_native_spawn(ctx,check,reward,x,y,layer,safe_delivery)
     local uid=spawn_reward(ctx,reward,ent_type,x,y,layer,false)
     ctx.spawn_replacements[check]=nil
     placements.configure_reward(uid,reward)
-    if uid then ctx.lifecycle:mark(check,"materialized") end
+    if uid then
+        ctx.placed_rewards[uid]=true
+        ctx.lifecycle:mark(check,"materialized")
+    end
     return uid
 end
 
