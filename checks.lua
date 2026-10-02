@@ -503,6 +503,12 @@ local function place_kali_present_source(ctx)
     end
     ctx.log("Kali Present altar level has no pet; will try the next eligible level")
 end
+local function player_owned(item)
+    for _,player in ipairs(players or {}) do
+        if item.last_owner_uid==player.uid or item.overlay==player then return true end
+    end
+    return false
+end
 -- Mod-placed rewards are excluded by uid, whatever order same-frame scans run in.
 local function new_kali_altar_items(ctx,altar,existing_items)
     local candidates={}
@@ -523,15 +529,17 @@ local function new_kali_altar_items(ctx,altar,existing_items)
                 and math.abs(item.x-pending_present.x)<=1.25
                 and math.abs(item.y-pending_present.y)<=1.25
             local is_placed_reward=ctx.placed_rewards[uid]
+            local is_player_owned=player_owned(item)
             if distance<=3 then
-                table.insert(observed,string.format("uid %d type %s at %.1f, %.1f%s%s",uid,tostring(item.type and item.type.id),item.x,item.y,
+                table.insert(observed,string.format("uid %d type %s at %.1f, %.1f%s%s%s",uid,tostring(item.type and item.type.id),item.x,item.y,
                     is_placed_reward and " (mod-placed reward)" or "",
+                    is_player_owned and " (player-owned)" or "",
                     is_pending_present_payload and " (pending Present payload)" or ""))
             end
             -- Kapala is the separate second Kali check, replaced through its
             -- dedicated native DROP hook. Never let the first-gift scan claim
             -- it when the counter jumps across the Kapala threshold.
-            if distance<=3 and not is_placed_reward and not is_pending_present_payload and item.type.id~=kapala_type then
+            if distance<=3 and not is_placed_reward and not is_player_owned and not is_pending_present_payload and item.type.id~=kapala_type then
                 table.insert(candidates,{entity=item,distance=distance})
             end
         end

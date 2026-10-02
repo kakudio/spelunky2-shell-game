@@ -406,6 +406,19 @@ for late=1,3 do
     end,{CHECK_KALI_ALTAR_1="REWARD_JETPACK"})
 end
 
+scenario("Kali's first gift and its clean-up leave items a player throws at the altar",function(game)
+    altar_level(game,2)
+    local player=game.players[1]
+    local held=game:native_spawn("ITEM_PICKUP_BOMBBAG",{x=ALTAR_X+1,y=ALTAR_Y+1,overlay=player})
+    local thrown=game:native_spawn("ITEM_BOMB",{x=ALTAR_X,y=ALTAR_Y+1,last_owner_uid=player.uid})
+    local gift=kali_gift(game,1,{"ITEM_PICKUP_ROPEPILE"})
+    game:frames(1)
+    expect(not game:entity(gift) and #game:spawned_of("ITEM_JETPACK")==1,"the first gift was not replaced")
+    local late=game:native_spawn("ITEM_BOMB",{x=ALTAR_X,y=ALTAR_Y+1,last_owner_uid=player.uid})
+    game:frames(4)
+    expect(game:entity(held) and game:entity(thrown) and game:entity(late),"a player's item at the altar was destroyed")
+end,{CHECK_KALI_ALTAR_1="REWARD_JETPACK"})
+
 local function deliver_first_gift(game)
     local delivered=#game:spawned_of("ITEM_JETPACK")
     local gift=kali_gift(game,game.state.kali_gifts+1,{"ITEM_PICKUP_ROPEPILE"})
