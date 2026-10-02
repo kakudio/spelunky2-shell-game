@@ -503,12 +503,14 @@ local function place_kali_present_source(ctx)
     end
     ctx.log("Kali Present altar level has no pet; will try the next eligible level")
 end
-local function replace_first_kali_gift(ctx,existing_items,attempt,replacement_uid)
-    if ctx.kali_first_gift_completed then return end
-    local player=players and players[1]
-    if not player then return end
-    local altar=nearest_kali_altar(player.x,player.y,player.layer)
-    if not altar then ctx.log("Kali first-gift check could not find an altar") return end
+local function player_owned(item)
+    for _,player in ipairs(players or {}) do
+        if item.last_owner_uid==player.uid or (item.overlay and item.overlay.uid==player.uid) then return true end
+    end
+    return false
+end
+-- Mod-placed rewards are excluded by uid, whatever order same-frame scans run in.
+local function new_kali_altar_items(ctx,altar,existing_items)
     local candidates={}
     local observed={}
     local pending_present=ctx.pending_kali_present_payload
@@ -526,45 +528,59 @@ local function replace_first_kali_gift(ctx,existing_items,attempt,replacement_ui
                 and item.layer==pending_present.layer
                 and math.abs(item.x-pending_present.x)<=1.25
                 and math.abs(item.y-pending_present.y)<=1.25
+            local is_placed_reward=ctx.placed_rewards[uid]
+            local is_player_owned=player_owned(item)
             if distance<=3 then
-                table.insert(observed,string.format("uid %d type %s at %.1f, %.1f%s%s",uid,tostring(item.type and item.type.id),item.x,item.y,
-                    uid==replacement_uid and " (prior replacement)" or "",
+                table.insert(observed,string.format("uid %d type %s at %.1f, %.1f%s%s%s",uid,tostring(item.type and item.type.id),item.x,item.y,
+                    is_placed_reward and " (mod-placed reward)" or "",
+                    is_player_owned and " (player-owned)" or "",
                     is_pending_present_payload and " (pending Present payload)" or ""))
             end
             -- Kapala is the separate second Kali check, replaced through its
             -- dedicated native DROP hook. Never let the first-gift scan claim
             -- it when the counter jumps across the Kapala threshold.
-            if distance<=3 and uid~=replacement_uid and not is_pending_present_payload and item.type.id~=kapala_type then
+            if distance<=3 and not is_placed_reward and not is_player_owned and not is_pending_present_payload and item.type.id~=kapala_type then
                 table.insert(candidates,{entity=item,distance=distance})
             end
         end
     end
     table.sort(candidates,function(a,b) return a.distance<b.distance end)
-    local candidate=candidates[1] and candidates[1].entity or nil
-    if candidate and not replacement_uid then
-        local expected=ctx.randomizer_state.mapping and ctx.randomizer_state.mapping.CHECK_KALI_ALTAR_1
-        ctx.log(string.format("Kali first-gift candidate uid %d type %d at %.1f, %.1f; mapped reward %s",candidate.uid,candidate.type.id,candidate.x,candidate.y,tostring(expected)))
-        -- Kali can emit a second native item after kali_gifts increments.
-        -- Replace the first one, then keep this source window open briefly
-        -- to remove only any additional native altar payloads.
-        replacement_uid=materialize(ctx,"CHECK_KALI_ALTAR_1",candidate.x,candidate.y,candidate.layer,candidate.uid,true,false)
-        if replacement_uid then ctx.kali_first_gift_completed=true end
-        ctx.log("Kali first-gift replacement result uid "..tostring(replacement_uid))
+    return candidates,observed
+end
+local function remove_extra_kali_gifts(ctx,extras)
+    for _,entry in ipairs(extras) do
+        entry.entity:destroy()
+        ctx.log("Removed extra native Kali first-gift item uid "..entry.entity.uid)
     end
-    if replacement_uid then
-        for _,entry in ipairs(candidates) do
-            local extra=entry.entity
-            if extra and extra.uid~=replacement_uid then
-                extra:destroy()
-                ctx.log("Removed extra native Kali first-gift item uid "..extra.uid)
-            end
-        end
-        if (attempt or 1)<3 then
-            ctx.defer(1,"Kali first-gift cleanup",function() replace_first_kali_gift(ctx,existing_items,(attempt or 1)+1,replacement_uid) end)
-        end
-    elseif not candidate then
+end
+-- Kali can emit a late native item; runs after the check is already complete.
+local function clean_up_first_kali_gift(ctx,altar,existing_items,pass)
+    ctx.defer(1,"Kali first-gift cleanup",function()
+        remove_extra_kali_gifts(ctx,(new_kali_altar_items(ctx,altar,existing_items)))
+        if pass<3 then clean_up_first_kali_gift(ctx,altar,existing_items,pass+1) end
+    end)
+end
+local function replace_first_kali_gift(ctx,existing_items)
+    if ctx.kali_first_gift_completed then return end
+    local player=players and players[1]
+    if not player then return end
+    local altar=nearest_kali_altar(player.x,player.y,player.layer)
+    if not altar then ctx.log("Kali first-gift check could not find an altar") return end
+    local candidates,observed=new_kali_altar_items(ctx,altar,existing_items)
+    local first=table.remove(candidates,1)
+    local candidate=first and first.entity
+    if not candidate then
         ctx.log("Kali first-gift check found no generated reward item near altar; new nearby items: "..(#observed>0 and table.concat(observed,"; ") or "none"))
+        return
     end
+    local expected=ctx.randomizer_state.mapping and ctx.randomizer_state.mapping.CHECK_KALI_ALTAR_1
+    ctx.log(string.format("Kali first-gift candidate uid %d type %d at %.1f, %.1f; mapped reward %s",candidate.uid,candidate.type.id,candidate.x,candidate.y,tostring(expected)))
+    local replacement_uid=materialize(ctx,"CHECK_KALI_ALTAR_1",candidate.x,candidate.y,candidate.layer,candidate.uid,true,false)
+    ctx.log("Kali first-gift replacement result uid "..tostring(replacement_uid))
+    if not replacement_uid then return end
+    ctx.kali_first_gift_completed=true
+    remove_extra_kali_gifts(ctx,candidates)
+    clean_up_first_kali_gift(ctx,altar,existing_items,1)
 end
 local function log_yang_anchor_failure(ctx)
     ctx.log("Yang native locked-pen anchor missing; nearby door diagnostics follow")
