@@ -144,9 +144,10 @@ ENT_TYPE.ITEM_PICKUP_SKELETON_KEY
 ## Building/Development
 
 To modify the mod:
-1. Edit the mod files.
-2. Run `powershell -ExecutionPolicy Bypass -File .\scripts\package.ps1` to create `dist/Spelunky2-ShellGame-vX.Y.Z.zip` and `dist/Spelunky2-ShellGame-vX.Y.Z-dev.zip`, each holding a single `ShellGame` folder.
-3. Reload scripts in Overlunky (Ctrl+F5) or restart game, then check the console (`~`) for logs.
+1. Clone or link the repository into the game as `Mods/Packs/ShellGame`, so it uses the same data folder as a packaged install. Run reports from a checkout say `Build: unpackaged checkout`.
+2. Edit the mod files.
+3. Run `powershell -ExecutionPolicy Bypass -File .\scripts\package.ps1` to create `dist/release/ShellGame.zip` and `dist/dev/ShellGame.zip`, each holding a single `ShellGame` folder. The script needs git: it stamps each archive with the commit it was built from (marked as having uncommitted changes if the tree is dirty), the `mod.json` version and the variant, and every run report's `Build:` line names them.
+4. Reload scripts in Overlunky (Ctrl+F5) or restart game, then check the console (`~`) for logs.
 
 ### Running the tests
 
