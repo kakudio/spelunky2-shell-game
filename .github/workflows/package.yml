@@ -1,0 +1,39 @@
+name: Package mod
+
+on:
+  workflow_call:
+    inputs:
+      ref:
+        description: Commit to package and stamp; defaults to the triggering commit.
+        type: string
+        default: ""
+
+permissions:
+  contents: read
+
+jobs:
+  package:
+    runs-on: windows-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref }}
+
+      - name: Package mod
+        shell: pwsh
+        run: ./scripts/package.ps1
+
+      - name: Upload release archive
+        uses: actions/upload-artifact@v4
+        with:
+          name: ShellGame
+          path: dist/release/ShellGame.zip
+          if-no-files-found: error
+
+      - name: Upload developer archive
+        uses: actions/upload-artifact@v4
+        with:
+          name: ShellGame-dev
+          path: dist/dev/ShellGame.zip
+          if-no-files-found: error

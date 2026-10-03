@@ -64,7 +64,7 @@ The randomizer can create paths like:
 3. **Playlunky** - Installed via Modlunky 2's "Playlunky" tab
 
 ### Steps
-1. Download `Spelunky2-ShellGame-vX.Y.Z.zip` from the [latest GitHub release](../../releases/latest)
+1. Download `ShellGame.zip` from the [latest GitHub release](../../releases/latest)
 2. Open Modlunky 2
 3. Go to **Mods** tab → **Open Mods Folder**
 4. Extract the downloaded archive into the Mods folder
@@ -92,7 +92,7 @@ Access options via Modlunky 2's options menu or Overlunky (F8) → Options:
 
 Leave **Generate Spoiler** and **Generate Logs** enabled. At the start of every
 run, the mod writes one report to the `run_reports/` folder in its data folder;
-for an install extracted from the release archive, that is
+for an install extracted from `ShellGame.zip`, that is
 `Mods/Data/ShellGame/run_reports/`.
 Either option can create that same file, containing its enabled section(s).
 Attach the newest `.txt` file when reporting a problem; with both enabled, it
@@ -101,6 +101,12 @@ and all Shell Game logs.
 Use `kir_report_path()` in the Overlunky console to print the current report's
 location. The mod retains the newest 30 reports and deletes older reports
 automatically.
+
+To check whether a fix works before it is released, download that change's
+build: open the pull request's (or the `main` commit's) **Tests** run under the
+[Actions tab](../../actions), and under **Artifacts** download `ShellGame` (or
+`ShellGame-dev` for the developer options and overlay logging). Each downloads
+as a zip wrapping `ShellGame.zip`; install that the same way as a release.
 
 ## Gameplay Tips
 
@@ -144,9 +150,10 @@ ENT_TYPE.ITEM_PICKUP_SKELETON_KEY
 ## Building/Development
 
 To modify the mod:
-1. Edit the mod files.
-2. Run `powershell -ExecutionPolicy Bypass -File .\scripts\package.ps1` to create `dist/Spelunky2-ShellGame-vX.Y.Z.zip` and `dist/Spelunky2-ShellGame-vX.Y.Z-dev.zip`, each holding a single `ShellGame` folder.
-3. Reload scripts in Overlunky (Ctrl+F5) or restart game, then check the console (`~`) for logs.
+1. Clone or link the repository into the game as `Mods/Packs/ShellGame`, so it uses the same data folder as a packaged install. Run reports from a checkout say `Build: unpackaged checkout`.
+2. Edit the mod files.
+3. Run `powershell -ExecutionPolicy Bypass -File .\scripts\package.ps1` to create `dist/release/ShellGame.zip` and `dist/dev/ShellGame.zip`, each holding a single `ShellGame` folder. The script needs git: it stamps each archive with the commit it was built from (marked as having uncommitted changes if the tree is dirty), the `mod.json` version and the variant, and every run report's `Build:` line names them.
+4. Reload scripts in Overlunky (Ctrl+F5) or restart game, then check the console (`~`) for logs.
 
 ### Running the tests
 
@@ -171,14 +178,16 @@ A pull request that adds or changes a check's adapter includes a stand-in scenar
 
 ## Releasing
 
-GitHub automatically packages the mod and publishes its zip when a version tag is pushed. Update `mod.json` first, commit it, then create and push a matching tag:
+GitHub automatically packages the mod and publishes `ShellGame.zip` (the release variant) when a version tag is pushed. Update `mod.json` first, commit it, then create and push a matching tag:
 
 ```powershell
 git tag v0.1.0
 git push origin v0.1.0
 ```
 
-The tag must exactly match the `version` in `mod.json` (for example, `0.1.0` requires `v0.1.0`). A manual run from the Actions page saves the zip as a downloadable workflow artifact without publishing a release.
+The tag must exactly match the `version` in `mod.json` (for example, `0.1.0` requires `v0.1.0`). Every run of the release workflow also saves the developer variant as the `ShellGame-dev` workflow artifact; it is never attached to the release. A manual run from the Actions page saves both variants as workflow artifacts (`ShellGame` and `ShellGame-dev`) without publishing a release.
+
+Every pull request and push to `main` packages both variants with the same script and saves them as `ShellGame` and `ShellGame-dev` artifacts on its **Tests** run. A pull request's builds are stamped with the pull request's head commit, not the merge commit GitHub tests against.
 
 ## Known Issues
 
