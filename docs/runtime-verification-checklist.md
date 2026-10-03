@@ -16,7 +16,7 @@ The following adapters also need one in-game test whenever their code changes:
 | --- | --- | --- |
 | Player-owned source guard | Carry a shuffled item through a route transition. | The item remains owned; console says `Ignored player_carried source` only if a scan sees it. |
 | Moon Challenge | Enter Jungle or Volcana Moon Challenge; also enter Volcana carrying a Bow. | Native back-layer Bow is replaced; a carried foreground Bow remains unchanged. |
-| Excalibur Stone | Visit Tide Pool with Crown/Hedjet, then enter Tide Pool holding Excalibur. | Stone reward is shuffled; carried Excalibur remains untouched. |
+| Excalibur Stone | Reach Tide Pool 4-2 wearing a Hedjet from a randomized reward; repeat with a Crown, and with the developer test resources' Crown. Also put one on partway through 4-2, and arrive wearing neither. Carry Excalibur in once. | Wearing either on arrival, or once one is put on in 4-2, the stone becomes its mapped reward; wearing neither, it stays native and `Excalibur gate is closed` is logged; a carried Excalibur remains untouched. |
 | Kali Altar 1 | Earn Kali's first normal reward, die, then repeat on a new run. | The check rewards on both runs; log includes `Kali first-gift candidate`. |
 | Kali Present | Read its target group in `kir_spoiler()`, then find the first level at or after that group with both Kali and a pet. | The pet becomes a Present once; its mapped reward appears at the altar. |
 | Kali Altar 2 | Earn Kapala. | `DROP.ALTAR_KAPALA` is replaced by the mapped reward. |

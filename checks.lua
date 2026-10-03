@@ -9,6 +9,9 @@ local M={}
 local materialize=adapters.materialize
 local replace_native_spawn=adapters.replace_native_spawn
 
+-- A Hedjet or Crown a player wears is a powerup, not an inventory item.
+local EXCALIBUR_GATE={"ITEM_POWERUP_HEDJET","ITEM_POWERUP_CROWN"}
+
 local ITEM_ANCHORS={
     -- The Black Market Hedjet is handled once the shop room and its owner are
     -- active, so its replacement remains a purchasable shop item.
@@ -23,7 +26,7 @@ local ITEM_ANCHORS={
     {source="ITEM_IDOL",check="CHECK_HUMPHEAD_CAVE_IDOL",theme=THEME.TIDE_POOL,level=2,layer=LAYER.BACK,snap=true},
     -- Excalibur is overlaid on its stone, so use its absolute coordinates and
     -- replace only after the room has finished constructing.
-    {source="ITEM_EXCALIBUR",check="CHECK_EXCALIBUR_STONE",theme=THEME.TIDE_POOL,pre_spawn=false,post_generation=false,snap=true,absolute=true,layer=LAYER.FRONT,requires_any={"ITEM_PICKUP_HEDJET","ITEM_PICKUP_CROWN"}},
+    {source="ITEM_EXCALIBUR",check="CHECK_EXCALIBUR_STONE",theme=THEME.TIDE_POOL,pre_spawn=false,post_generation=false,snap=true,absolute=true,layer=LAYER.FRONT,requires_worn=EXCALIBUR_GATE},
     {source="ITEM_CLONEGUN",check="CHECK_STARS_CHALLENGE_TIDE_POOL",theme=THEME.TIDE_POOL},
     {source="ITEM_PICKUP_ELIXIR",check="CHECK_STARS_CHALLENGE_TEMPLE",theme=THEME.TEMPLE},
     {source="ITEM_LIGHT_ARROW",check="CHECK_SUN_CHALLENGE",theme=THEME.SUNKEN_CITY},
@@ -63,13 +66,13 @@ local DROP_CONFIGS={
 local YANG_DOOR_TYPES={"FLOOR_DOOR_LOCKED_PEN"}
 local YANG_FAILURE_ENTITY_TYPES={"FLOOR_DOOR_LAYER","FLOOR_DOOR_LOCKED_PEN","LOGICAL_DOOR","BG_SHOP_BACKDOOR","BG_DOOR_FRONT_LAYER","BG_DOOR_BACK_LAYER"}
 
-local function players_have_any(named_types)
-    if not named_types or #named_types==0 then return true end
-    for _,name in ipairs(named_types or {}) do
-        local ent_type=placements.type_of(name)
-        if ent_type then
+local function players_wear_any(powerup_names)
+    if not powerup_names or #powerup_names==0 then return true end
+    for _,name in ipairs(powerup_names) do
+        local powerup_type=placements.type_of(name)
+        if powerup_type then
             for _,player in ipairs(players or {}) do
-                if entity_has_item_type(player.uid,ent_type) then return true end
+                if player:has_powerup(powerup_type) then return true end
             end
         end
     end
@@ -622,19 +625,25 @@ local function yang_position(ctx, yang)
     return nil
 end
 
+local function in_excalibur_level(ctx)
+    return state.theme==THEME.TIDE_POOL and state.level==2 and not ctx.randomizer_state.level_materialized.CHECK_EXCALIBUR_STONE
+end
+
 -- The sword-in-stone can appear after POST_LEVEL_GENERATION, while a test
 -- Crown is granted at START. Check both conditions here rather than deciding
 -- while the room is still being assembled.
 function M.replace_excalibur_if_gated(ctx, attempt)
     -- Excalibur's stone only exists in Tide Pool 4-2. Restricting this avoids
     -- scanning player-carried swords (and retrying) on Tide Pool 4-1/4-3.
-    if state.theme~=THEME.TIDE_POOL or state.level~=2 or ctx.randomizer_state.level_materialized.CHECK_EXCALIBUR_STONE then return end
-    local has_crown=players_have_any({"ITEM_PICKUP_CROWN"})
-    local has_hedjet=players_have_any({"ITEM_PICKUP_HEDJET"})
+    if not in_excalibur_level(ctx) then return end
+    local has_crown=players_wear_any({"ITEM_POWERUP_CROWN"})
+    local has_hedjet=players_wear_any({"ITEM_POWERUP_HEDJET"})
     if not (has_crown or has_hedjet) then
-        ctx.log("Excalibur gate is closed: no player holds a Crown or Hedjet")
+        if not ctx.excalibur_gate_closed then ctx.log("Excalibur gate is closed: no player wears a Crown or Hedjet") end
+        ctx.excalibur_gate_closed=true
         return
     end
+    ctx.excalibur_gate_closed=false
     local excalibur_type=placements.type_of("ITEM_EXCALIBUR")
     local swords=excalibur_type and get_entities_by_type(excalibur_type) or {}
     ctx.log(string.format("Excalibur gate is open (Crown=%s Hedjet=%s); found %d sword-in-stone entities",tostring(has_crown),tostring(has_hedjet),#swords))
@@ -880,7 +889,7 @@ function M.on_post_level_generation(ctx)
     end
     ctx.log(string.format("Scanning %d item entities in theme %s",#items,tostring(theme)))
     for _,anchor in ipairs(ITEM_ANCHORS) do
-        if anchor.post_generation~=false and theme==anchor.theme and (not anchor.level or state.level==anchor.level) and players_have_any(anchor.requires_any) then
+        if anchor.post_generation~=false and theme==anchor.theme and (not anchor.level or state.level==anchor.level) and players_wear_any(anchor.requires_worn) then
             local source_type=placements.type_of(anchor.source)
             if source_type then
                 local source_uids=anchor.absolute and get_entities_by_type(source_type) or items
@@ -1152,7 +1161,7 @@ function M.register_spawn_hooks(ctx)
         local source_type=placements.type_of(anchor.source)
         if source_type and anchor.pre_spawn~=false then
             set_pre_entity_spawn(function(entity_type,x,y,layer)
-                if entity_type~=source_type or state.theme~=anchor.theme or (anchor.level and state.level~=anchor.level) or (anchor.layer and layer~=anchor.layer) or not players_have_any(anchor.requires_any) then return nil end
+                if entity_type~=source_type or state.theme~=anchor.theme or (anchor.level and state.level~=anchor.level) or (anchor.layer and layer~=anchor.layer) or not players_wear_any(anchor.requires_worn) then return nil end
                 if anchor.shop_only and (not is_inside_active_shop_room or not is_inside_active_shop_room(x,y,layer)) then return nil end
                 ctx.initialize()
                 local reward=placements.reward_type(ctx.randomizer_state,anchor.check)
@@ -1274,13 +1283,12 @@ function M.register_spawn_hooks(ctx)
         ctx.log("Sun Challenge supplies adapter unavailable: ITEM_PICKUP_PLAYERBAG is missing")
     end
 
-    -- The game increments won_prizes_count before spawning the associated
-    -- prize. Wait for five so only Tusk's fifth successful seven is replaced;
-    -- the first four prizes remain vanilla.
+    -- Each prize is staged behind the forcefield before it is won, so the
+    -- fifth spawns while won_prizes_count is still four.
     set_pre_entity_spawn(function(entity_type,x,y,layer)
         if state.theme~=THEME.TIDE_POOL or ctx.randomizer_state.level_materialized.CHECK_TUSK_DICE_HOUSE then return nil end
         local dice=state.logic and state.logic.diceshop
-        if not dice or dice.won_prizes_count~=5 or not dice.prize_dispenser or dice.prize_dispenser<0 then return nil end
+        if not dice or dice.won_prizes_count~=4 or not dice.prize_dispenser or dice.prize_dispenser<0 then return nil end
         local dispenser=get_entity(dice.prize_dispenser)
         if not dispenser or dispenser.layer~=layer or math.abs(dispenser.x-x)+math.abs(dispenser.y-y)>3 then return nil end
         local reward=placements.reward_type(ctx.randomizer_state,"CHECK_TUSK_DICE_HOUSE")
@@ -1334,6 +1342,13 @@ function M.register_spawn_hooks(ctx)
             ctx.kali_last_gifts=gifts
         end
         ctx.kali_known_items=current_items
+    end,ON.FRAME)
+
+    -- A Hedjet or Crown first worn partway through 4-2 opens the gate there.
+    set_callback(function()
+        if ctx.excalibur_gate_closed and in_excalibur_level(ctx) and players_wear_any(EXCALIBUR_GATE) then
+            M.replace_excalibur_if_gated(ctx)
+        end
     end,ON.FRAME)
 
     -- Lahamu may be removed by its level logic rather than a standard kill.
