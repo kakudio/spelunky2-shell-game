@@ -200,6 +200,6 @@ new run
   entity spawn order.
 - Run reports and UI should display both `Game seed` and `Randomizer seed`.
 
-This replaces the current behavior of rebuilding/shuffling the item pool during
+This replaced the earlier behavior of rebuilding/shuffling the item pool during
 level lifecycle callbacks. It also makes a shared randomizer seed suitable for
 races even when participants use different level seeds.

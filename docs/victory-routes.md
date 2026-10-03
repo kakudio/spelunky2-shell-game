@@ -48,5 +48,5 @@ Continue through either Tide Pool or Temple -> Ice Caves -> Neo Babylon
 At Hundun: Tablet + Bow + Arrow satisfies VICTORY_COSMIC_OCEAN.
 ```
 
-These are dry-run logic routes. They do not certify the event-specific anchor
-adapters listed in `implementation-review.md`; those need in-game smoke tests.
+These are dry-run logic routes. They do not certify any in-game adapter; see
+the [verification ledger](verified-checks.md).

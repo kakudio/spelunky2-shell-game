@@ -1,67 +1,78 @@
 # Check verification ledger
 
-Last updated: 2026-08-04
+This ledger is the only place that records whether a check works in-game.
+Other documents describe how checks are built and tested, and link here for
+results.
 
-Status is intentionally based on observed in-game behavior, not merely on the
-presence of an adapter in code. A fresh logic-version change requires a new
-run before treating a previous result as current.
+## Rules
 
-## Verified working in-game
+- A result is an observation from a real in-game run, not the presence of an
+  adapter in code.
+- A change to a check's adapter requires a new in-game run before that check's
+  previous result counts again.
+- A logic-version change alone does not demote a check.
+- `kir_fuzz(1000, 1)` and `kir_validate(seed)` remain required after every
+  logic change.
 
-| Check | What was verified |
-|---|---|
-| `CHECK_UDJAT_CHEST` | The native Udjat Eye spawn is replaced by the mapped reward. |
-| `CHECK_YANG` | The mapped reward is placed at Yang's back-layer reward-door anchor. |
-| `CHECK_QUILLBACK` | Quillback's native Bomb Bag drop is replaced after his death. |
-| `CHECK_MOON_CHALLENGE_JUNGLE` / `CHECK_MOON_CHALLENGE_VOLCANA` | The native Bow is safely hidden, its arrow removed, and the mapped reward can be collected after challenge completion. |
-| `CHECK_VLADS_CASTLE` | The Castle reward is replaced in the intended back-layer area. |
-| `CHECK_VLAD` | Vlad's death reward is replaced. |
-| `CHECK_VAN_HORSING_RESCUE` | Van Horsing's rescue reward is replaced. |
-| `CHECK_TUSK_DICE_HOUSE` | The fifth/final Dice House prize is replaced. |
-| `CHECK_SISTERS_OLMEC_REWARD` | The combined Sisters reward at Olmec is replaced. |
-| `CHECK_OLMEC_ANKH` | Olmec's native Ankh reward is replaced. |
-| `CHECK_EXCALIBUR_STONE` | With collected Crown/Hedjet progression, the late-spawned sword-in-stone is replaced by the mapped reward. |
-| `CHECK_BEG_FIRST_MEETING` | Beg's first-meeting Bomb Bag reward is replaced by the mapped reward. |
-| `CHECK_KALI_PRESENT` | The pet-to-Present source works, and sacrificing that Present at a Kali altar produces the mapped reward. |
-| `CHECK_KALI_ALTAR_1` | Kali's first normal reward is replaced by the mapped reward. |
-| `CHECK_TUSK_IDOL` | Tusk's Idol is replaced by the mapped reward at its intended room anchor. |
-| `CHECK_SPARROW` | Sparrow's Rope Pile reward is replaced by the mapped reward. |
-| `CHECK_KINGU` | Kingu's Tablet drop is replaced by the mapped reward on defeat. |
-| `CHECK_STARS_CHALLENGE_TIDE_POOL` | The Tide Pool Stars Challenge reward is replaced by the mapped reward. |
-| `CHECK_HUMPHEAD` | Humphead's present is replaced by the mapped reward on defeat. |
-| `CHECK_YETI_QUEEN` / `CHECK_YETI_KING` | Each Yeti royal reward is replaced by its mapped reward. |
-| `CHECK_MOTHERSHIP_PLASMA_CANNON` | The Mothership's back-layer Plasma Cannon is replaced by the mapped reward. |
-| `CHECK_LAHAMU` | Lahamu's reward is replaced by the mapped reward on defeat. |
-| `CHECK_BEG_TRUE_CROWN` | Beg's True Crown reward is replaced by the mapped reward. |
-| `CHECK_KALI_ALTAR_2` | Kali's second reward is replaced by the mapped reward. |
-| `CHECK_ANUBIS_SCEPTER` | Anubis's Scepter drop is replaced by the mapped reward on defeat. |
-| `CHECK_TUSK_PALACE_VISIT` | Tusk's Palace reward is replaced by the mapped reward. |
-| `CHECK_HUMPHEAD_CAVE_IDOL` | Great Humphead's cave Idol is replaced by the mapped reward. |
-| `CHECK_STARS_CHALLENGE_TEMPLE` | The Temple Stars Challenge reward is replaced by the mapped reward. |
-| `CHECK_OSIRIS` | Osiris's Tablet drop is replaced by the mapped reward on defeat. |
-| `CHECK_TIAMAT` | Tiamat's reward is replaced by the mapped reward on defeat. |
-| `CHECK_ANUBIS_II` | Anubis II's reward is replaced by the mapped reward on defeat. |
-| `CHECK_ALIEN_COMPASS` | Van Horsing's Alien Compass reward is replaced by the mapped reward. |
-| `CHECK_SUN_CHALLENGE` | The Sun Challenge Arrow of Light reward is replaced by the mapped reward. |
-| `CHECK_SUN_CHALLENGE_SUPPLIES` | The Sun Challenge's separate supplies Player Bag reward is replaced by the mapped reward. |
-| `CHECK_EGGPLANT_KING` | Yama's native Eggplant Crown drop is replaced by the mapped reward. |
-| `CHECK_SPARROW_VAULT` | Sparrow's vault-completion Player Bag is replaced by the mapped reward. |
-| `CHECK_QUEEN_BEE` | Queen Bee's native Royal Jelly drop is replaced by a non-key mapped reward. |
+Each row is either **verified** or **not yet verified**. Statuses come from
+the final pass in the
+[runtime verification checklist](runtime-verification-checklist.md#final-pass):
+exactly the rows the tester ticked on the pull request are verified, with the
+session date and the row's expected result as what was observed. Every other
+row is not yet verified.
 
-## Implemented, not yet verified in-game
+Adapters changed after the previous in-game pass (2026-08-04), so none of its
+observations are carried forward.
 
-| Check(s) | Test to perform |
-|---|---|
-| True Crown recovery | Complete Beg's True Crown check while cursed and below 4 HP; verify curse removal and health restoration. Then repeat while uncursed to confirm health is unchanged. |
+## Checks
 
-## Run-level verification
+| Check | Status | Verified on | Observed |
+|---|---|---|---|
+| `CHECK_UDJAT_CHEST` | Not yet verified | | |
+| `CHECK_YANG` | Not yet verified | | |
+| `CHECK_QUILLBACK` | Not yet verified | | |
+| `CHECK_BLACK_MARKET` | Not yet verified | | |
+| `CHECK_QUEEN_BEE` | Not yet verified | | |
+| `CHECK_SISTERS_OLMEC_REWARD` | Not yet verified | | |
+| `CHECK_VAN_HORSING_RESCUE` | Not yet verified | | |
+| `CHECK_VLADS_CASTLE` | Not yet verified | | |
+| `CHECK_VLAD` | Not yet verified | | |
+| `CHECK_MOON_CHALLENGE_JUNGLE` | Not yet verified | | |
+| `CHECK_MOON_CHALLENGE_VOLCANA` | Not yet verified | | |
+| `CHECK_OLMEC_ANKH` | Not yet verified | | |
+| `CHECK_KALI_ALTAR_1` | Not yet verified | | |
+| `CHECK_KALI_PRESENT` | Not yet verified | | |
+| `CHECK_BEG_FIRST_MEETING` | Not yet verified | | |
+| `CHECK_SPARROW` | Not yet verified | | |
+| `CHECK_TUSK_DICE_HOUSE` | Not yet verified | | |
+| `CHECK_HUMPHEAD_CAVE_IDOL` | Not yet verified | | |
+| `CHECK_EXCALIBUR_STONE` | Not yet verified | | |
+| `CHECK_TUSK_IDOL` | Not yet verified | | |
+| `CHECK_ANUBIS_SCEPTER` | Not yet verified | | |
+| `CHECK_ALIEN_COMPASS` | Not yet verified | | |
+| `CHECK_STARS_CHALLENGE_TIDE_POOL` | Not yet verified | | |
+| `CHECK_STARS_CHALLENGE_TEMPLE` | Not yet verified | | |
+| `CHECK_HUMPHEAD` | Not yet verified | | |
+| `CHECK_YETI_QUEEN` | Not yet verified | | |
+| `CHECK_YETI_KING` | Not yet verified | | |
+| `CHECK_KINGU` | Not yet verified | | |
+| `CHECK_OSIRIS` | Not yet verified | | |
+| `CHECK_ANUBIS_II` | Not yet verified | | |
+| `CHECK_LAHAMU` | Not yet verified | | |
+| `CHECK_MOTHERSHIP_PLASMA_CANNON` | Not yet verified | | |
+| `CHECK_TUSK_PALACE_VISIT` | Not yet verified | | |
+| `CHECK_SPARROW_VAULT` | Not yet verified | | |
+| `CHECK_KALI_ALTAR_2` | Not yet verified | | |
+| `CHECK_BEG_TRUE_CROWN` | Not yet verified | | |
+| `CHECK_TIAMAT` | Not yet verified | | |
+| `CHECK_SUN_CHALLENGE` | Not yet verified | | |
+| `CHECK_SUN_CHALLENGE_SUPPLIES` | Not yet verified | | |
+| `CHECK_EGGPLANT_KING` | Not yet verified | | |
 
-- `kir_fuzz(1000, 1)` must pass after every logic change.
-- `kir_validate(seed)` must report a victory route for each selected seed.
-- `kir_spoiler()` must remain stable for the same non-zero randomizer seed.
-- Save/quit/reload with an uncollected mapped item still on the ground; verify
-  it neither vanishes nor duplicates.
-- Enter Duat while holding an item and wearing a back item; verify both copies
-  appear on Duat's Kali altar, while the Ankh remains consumed.
-- Complete Beg's True Crown check while cursed; verify the player is cured and
-  restored to at least 4 HP, while uncursed players' health is unchanged.
+## Run-level items
+
+| Item | Status | Verified on | Observed |
+|---|---|---|---|
+| `RUN_SAVE_RELOAD` | Not yet verified | | |
+| `RUN_DUAT_ALTAR_COPIES` | Not yet verified | | |
+| `RUN_TRUE_CROWN_RECOVERY` | Not yet verified | | |
