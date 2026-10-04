@@ -569,6 +569,52 @@ scenario("Tusk's Dice House pays four vanilla prizes and the mapped reward fifth
     expect(after and after.type.id==game.dice_prizes[6].native,"the item staged after the fifth prize was replaced")
 end,{CHECK_TUSK_DICE_HOUSE="REWARD_ALIEN_COMPASS"})
 
+local function dice_lines(game)
+    local lines={}
+    for _,message in ipairs(game.logs) do
+        if message:find("Dice House",1,true) then table.insert(lines,message) end
+    end
+    return lines
+end
+
+scenario("the run log shows each Dice House prize, its count and the mod's decision",function(game)
+    local player=game:add_player{x=1,y=1}
+    dice_house(game)
+    for _=1,5 do game:win_dice_prize(player) end
+    local natives={"ITEM_PICKUP_BOMBBAG","ITEM_PICKUP_ROPEPILE","ITEM_PICKUP_PARACHUTE","ITEM_PICKUP_SPECTACLES"}
+    for n,native in ipairs(natives) do
+        expect(game:logged("Dice House item #"..n.." "..native.." at 20.0, 31.0 layer 0 (prize count "..(n-1)..") left native: prize count is "..(n-1)..", not 4"),
+            "prize "..n.." was not logged as left native")
+        expect(game:logged("Dice House prize count "..(n-1).." -> "..n),"the win of prize "..n.." was not logged")
+    end
+    expect(game:logged("Dice House item #5 ITEM_PICKUP_CLIMBINGGLOVES at 20.0, 31.0 layer 0 (prize count 4) replaced with REWARD_ALIEN_COMPASS"),
+        "the fifth prize's replacement was not logged with its native item")
+    expect(game:logged("CHECK CHECK_TUSK_DICE_HOUSE -> REWARD_ALIEN_COMPASS (native reward spawn hook)"),"the check line is missing")
+    expect(game:logged("Dice House prize count 4 -> 5"),"the fifth win was not logged")
+    expect(game:logged("Dice House item #6 ITEM_PICKUP_PITCHERSMITT at 20.0, 31.0 layer 0 (prize count 5) left native: CHECK_TUSK_DICE_HOUSE already materialized"),
+        "the item staged after the fifth prize was not logged")
+    expect(not game:logged("ITEM_PICKUP_SPECIALCOMPASS at"),"the mod's own reward spawn was logged as a dispenser item")
+end,{CHECK_TUSK_DICE_HOUSE="REWARD_ALIEN_COMPASS"})
+
+scenario("Dice House logging stays quiet away from the dispenser and outside a Dice House",function(game)
+    tide_pool(game,1)
+    game:native_spawn("ITEM_PICKUP_BOMBBAG",{x=20,y=31})
+    game:frames(2)
+    expect(#dice_lines(game)==0,"a Tide Pool level without a Dice House logged Dice House lines")
+
+    dice_house(game)
+    local staged=#dice_lines(game)
+    game:native_spawn("ITEM_PICKUP_ROPEPILE",{x=40,y=31})
+    game:native_spawn("ITEM_PICKUP_ROPEPILE",{x=20,y=50,layer=LAYER.BACK})
+    game:frames(5)
+    expect(#dice_lines(game)==staged,"spawns away from the dispenser, or idle frames, added Dice House lines")
+
+    game:start_level{theme=THEME.DWELLING,world=1,level=2}
+    game:native_spawn("ITEM_PICKUP_BOMBBAG",{x=20,y=31})
+    game:frames(2)
+    expect(#dice_lines(game)==staged,"a level outside Tide Pool logged Dice House lines")
+end,{CHECK_TUSK_DICE_HOUSE="REWARD_ALIEN_COMPASS"})
+
 function M.run()
     local failures={}
     for _,entry in ipairs(scenarios) do

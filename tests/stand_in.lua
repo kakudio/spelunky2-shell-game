@@ -91,10 +91,19 @@ end
 
 function Game:_install(overrides)
     local game=self
-    local ENT_TYPE=setmetatable({},{__index=function(_,name)
-        local id=game.ENT_TYPE[name]
-        return id or nil
-    end})
+    local ENT_TYPE=setmetatable({},{
+        __index=function(_,name)
+            local id=game.ENT_TYPE[name]
+            return id or nil
+        end,
+        __pairs=function()
+            return function(_,name)
+                local id
+                repeat name,id=next(game.ENT_TYPE,name) until id~=false
+                return name,id
+            end,nil,nil
+        end,
+    })
     local globals={
         state=self.state, players=self.players,
         ENT_TYPE=ENT_TYPE, THEME=M.THEME, LAYER=M.LAYER, MASK=M.MASK, SPAWN_TYPE=M.SPAWN_TYPE,

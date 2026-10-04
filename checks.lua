@@ -1018,6 +1018,50 @@ function M.on_balance_post_level_generation(ctx)
     duat.on_post_level_generation(ctx)
 end
 
+-- Each prize is staged behind the forcefield before it is won, so the
+-- fifth spawns while won_prizes_count is still four.
+local DICE_PRIZE_COUNT=4
+local DICE_REPLACE_RADIUS=3
+local DICE_LOG_RADIUS=6
+local function active_dice_shop()
+    if state.theme~=THEME.TIDE_POOL then return nil end
+    local dice=state.logic and state.logic.diceshop
+    if not dice or not dice.prize_dispenser or dice.prize_dispenser<0 then return nil end
+    local dispenser=get_entity(dice.prize_dispenser)
+    if not dispenser then return nil end
+    return dice,dispenser
+end
+-- Returns no shop for the mod's own spawns; a nil reason means replace it.
+local function dice_prize_decision(ctx,x,y,layer)
+    if ctx.materializing or ctx.spawn_replacements.CHECK_TUSK_DICE_HOUSE then return nil end
+    local dice,dispenser=active_dice_shop()
+    if not dice then return nil end
+    local distance=math.abs(dispenser.x-x)+math.abs(dispenser.y-y)
+    if dispenser.layer~=layer then return dice,distance,"wrong layer (dispenser is on layer "..tostring(dispenser.layer)..")" end
+    if distance>DICE_REPLACE_RADIUS then return dice,distance,string.format("too far from the dispenser (%.1f > %d)",distance,DICE_REPLACE_RADIUS) end
+    if ctx.randomizer_state.level_materialized.CHECK_TUSK_DICE_HOUSE then return dice,distance,"CHECK_TUSK_DICE_HOUSE already materialized" end
+    if dice.won_prizes_count~=DICE_PRIZE_COUNT then return dice,distance,"prize count is "..tostring(dice.won_prizes_count)..", not "..DICE_PRIZE_COUNT end
+    return dice,distance,nil
+end
+local function note_dice_count(ctx,dice)
+    local seen=ctx.dice_house
+    if not seen then
+        ctx.dice_house={count=dice.won_prizes_count,items=0}
+        local dispenser=get_entity(dice.prize_dispenser)
+        ctx.log(string.format("Dice House dispenser uid %d at %.1f, %.1f layer %s; prize count %s",
+            dice.prize_dispenser,dispenser.x,dispenser.y,tostring(dispenser.layer),tostring(dice.won_prizes_count)))
+    elseif seen.count~=dice.won_prizes_count then
+        ctx.log("Dice House prize count "..tostring(seen.count).." -> "..tostring(dice.won_prizes_count))
+        seen.count=dice.won_prizes_count
+    end
+end
+local function note_dice_item(ctx,dice,entity_type,x,y,layer)
+    note_dice_count(ctx,dice)
+    ctx.dice_house.items=ctx.dice_house.items+1
+    return string.format("Dice House item #%d %s at %.1f, %.1f layer %s (prize count %s)",
+        ctx.dice_house.items,placements.name_of(entity_type),x,y,tostring(layer),tostring(dice.won_prizes_count))
+end
+
 function M.register_spawn_hooks(ctx)
     sparrow.register(ctx)
     duat.register(ctx)
@@ -1267,17 +1311,23 @@ function M.register_spawn_hooks(ctx)
         ctx.log("Sun Challenge supplies adapter unavailable: ITEM_PICKUP_PLAYERBAG is missing")
     end
 
-    -- Each prize is staged behind the forcefield before it is won, so the
-    -- fifth spawns while won_prizes_count is still four.
     set_pre_entity_spawn(function(entity_type,x,y,layer)
-        if state.theme~=THEME.TIDE_POOL or ctx.randomizer_state.level_materialized.CHECK_TUSK_DICE_HOUSE then return nil end
-        local dice=state.logic and state.logic.diceshop
-        if not dice or dice.won_prizes_count~=4 or not dice.prize_dispenser or dice.prize_dispenser<0 then return nil end
-        local dispenser=get_entity(dice.prize_dispenser)
-        if not dispenser or dispenser.layer~=layer or math.abs(dispenser.x-x)+math.abs(dispenser.y-y)>3 then return nil end
+        local dice,distance,reason=dice_prize_decision(ctx,x,y,layer)
+        if not dice or distance>DICE_LOG_RADIUS then return nil end
+        local item=note_dice_item(ctx,dice,entity_type,x,y,layer)
+        if reason then
+            ctx.log(item.." left native: "..reason)
+            return nil
+        end
         local reward=placements.reward_type(ctx.randomizer_state,"CHECK_TUSK_DICE_HOUSE")
-        return replace_native_spawn(ctx,"CHECK_TUSK_DICE_HOUSE",reward,x,y,layer,true)
+        local uid=replace_native_spawn(ctx,"CHECK_TUSK_DICE_HOUSE",reward,x,y,layer,true)
+        ctx.log(item..(uid and " replaced with "..tostring(reward) or " left native: the reward could not be spawned"))
+        return uid
     end,SPAWN_TYPE.ANY,MASK.ITEM)
+    set_callback(function()
+        local dice=active_dice_shop()
+        if dice then note_dice_count(ctx,dice) end
+    end,ON.FRAME)
 
     -- `kali_gifts` changes only after Kali awards a gift. The first normal
     -- gift is not a fixed drop type, so replace the newly generated item at
