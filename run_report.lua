@@ -1,5 +1,6 @@
 -- Per-run diagnostic reports for player issue submissions.
 
+local build_config=require "build_config"
 local REPORT_LIMIT=30
 local M={pending_logs={},run_number=0,filename=nil,enabled=true,write_logs=true,write_failed=false}
 
@@ -16,6 +17,14 @@ local function game_seed()
     local ok,first,second=pcall(get_adventure_seed,true)
     if not ok then return "unavailable" end
     return tostring(first)..","..tostring(second)
+end
+
+local function build_description(build)
+    if type(build)~="table" or not build.commit then
+        return "unpackaged checkout (no commit or version stamp)"
+    end
+    return string.format("version %s, %s variant, commit %s%s",tostring(build.version),tostring(build.variant),
+        tostring(build.commit),build.dirty and " with uncommitted changes" or "")
 end
 
 local function prune_old_reports()
@@ -54,6 +63,7 @@ function M.begin(randomizer_state,logic,write_spoiler,write_logs)
     local file=io.open_data(M.filename,"w")
     if not file then M.write_failed=true; return nil end
     file:write("Shell Game run report\n")
+    file:write("Build: ",build_description(build_config.build),"\n")
     file:write("Randomizer seed: ",tostring(randomizer_state.seed),"\n")
     file:write("Game adventure run seed: ",game_seed(),"\n")
     file:write("Logic version: ",tostring(logic.LOGIC_VERSION),"\n")

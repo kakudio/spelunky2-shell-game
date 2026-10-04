@@ -26,3 +26,8 @@ jobs:
 
       - name: Run test suites
         run: lua5.4 scripts/run_tests.lua
+
+  package:
+    uses: ./.github/workflows/package.yml
+    with:
+      ref: ${{ github.event.pull_request.head.sha || github.sha }}
