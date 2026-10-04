@@ -59,6 +59,8 @@ function M.reset_level(ctx)
     ctx.lahamu_diagnostic_logged=false
     ctx.duat_recovery_spawned=false
     ctx.duat_recovery_scan_signature=nil
+    ctx.excalibur_gate_closed=false
+    ctx.dice_house=nil
 end
 
 function M.reset_run(ctx)
