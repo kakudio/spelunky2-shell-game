@@ -364,14 +364,19 @@ local function altar_level(game,level,entities)
     return placed
 end
 
--- Kali raises the gift counter and emits her native items at the altar in
--- the same frame; the adapter sees both on that frame's ON.FRAME.
-local function kali_gift(game,gifts,emitted)
-    game.state.kali_gifts=gifts
+local function kali_emit(game,emitted)
     local uids={}
     for index,name in ipairs(emitted or {}) do
         table.insert(uids,game:native_spawn(name,{x=ALTAR_X+index-1,y=ALTAR_Y+1}))
     end
+    return uids
+end
+
+-- Kali raises the gift counter and emits her native items at the altar in
+-- the same frame; the adapter sees both on that frame's ON.FRAME.
+local function kali_gift(game,gifts,emitted)
+    game.state.kali_gifts=gifts
+    local uids=kali_emit(game,emitted)
     game:frames(1)
     return table.unpack(uids)
 end
@@ -389,6 +394,41 @@ scenario("Kali's first gift is replaced by the mapped reward one frame later",fu
     game:frames(3)
     expect(#get_entities_by_type(game.ENT_TYPE.ITEM_PICKUP_BOMBBAG)==1,"an item away from the altar was removed")
     expect(#game:spawned_of("ITEM_JETPACK")==1,"the first altar check materialized more than once")
+end,{CHECK_KALI_ALTAR_1="REWARD_JETPACK"})
+
+for late=1,3 do
+    scenario("Kali's first-gift clean-up removes a native item emitted "..late.." frame(s) after the swap",function(game)
+        local _,beside,away=table.unpack(altar_level(game,2,{
+            {"ITEM_PICKUP_BOMBBAG",x=ALTAR_X-1,y=ALTAR_Y+1},
+            {"ITEM_PICKUP_BOMBBAG",x=ALTAR_X+10,y=ALTAR_Y+1},
+        }))
+        kali_gift(game,1,{"ITEM_PICKUP_ROPEPILE"})
+        game:frames(1)
+        local reward=game:spawned_of("ITEM_JETPACK")[1]
+        expect(reward,"the first gift was not replaced")
+        game:frames(late-1)
+        local stray=kali_emit(game,{"ITEM_PICKUP_ROPEPILE"})[1]
+        game:frames(1)
+        expect(not game:entity(stray),"a native item emitted "..late.." frame(s) after the swap was left at the altar")
+        game:frames(4)
+        expect(game:entity(reward.uid),"the clean-up removed the mapped reward")
+        expect(game:entity(beside.uid),"an item already beside the altar was removed")
+        expect(game:entity(away.uid),"an item away from the altar was removed")
+        expect(#game.timeouts==0,"the clean-up kept running past its window")
+    end,{CHECK_KALI_ALTAR_1="REWARD_JETPACK"})
+end
+
+scenario("Kali's first gift and its clean-up leave items a player throws at the altar",function(game)
+    altar_level(game,2)
+    local player=game.players[1]
+    local held=game:native_spawn("ITEM_PICKUP_BOMBBAG",{x=ALTAR_X+1,y=ALTAR_Y+1,overlay=player})
+    local thrown=game:native_spawn("ITEM_BOMB",{x=ALTAR_X,y=ALTAR_Y+1,last_owner_uid=player.uid})
+    local gift=kali_gift(game,1,{"ITEM_PICKUP_ROPEPILE"})
+    game:frames(1)
+    expect(not game:entity(gift) and #game:spawned_of("ITEM_JETPACK")==1,"the first gift was not replaced")
+    local late=game:native_spawn("ITEM_BOMB",{x=ALTAR_X,y=ALTAR_Y+1,last_owner_uid=player.uid})
+    game:frames(4)
+    expect(game:entity(held) and game:entity(thrown) and game:entity(late),"a player's item at the altar was destroyed")
 end,{CHECK_KALI_ALTAR_1="REWARD_JETPACK"})
 
 local function deliver_first_gift(game)
@@ -464,12 +504,17 @@ local function kali_present(game)
     return presents[#presents] and game:entity(presents[#presents].uid)
 end
 
--- Kali turns a Present sacrificed on her altar into an Eggplant at the same
--- spot.
-local function sacrifice(game,present)
+local function offer_present(game,present)
     present.x,present.y=ALTAR_X,ALTAR_Y+1
     present:destroy()
-    local eggplant=game:native_spawn("ITEM_EGGPLANT",{x=present.x,y=present.y})
+end
+
+-- Kali turns a Present sacrificed on her altar into an Eggplant at the same
+-- spot; the sacrifice may also raise her gift counter.
+local function sacrifice(game,present,gifts)
+    offer_present(game,present)
+    game.state.kali_gifts=gifts or game.state.kali_gifts
+    local eggplant=game:native_spawn("ITEM_EGGPLANT",{x=ALTAR_X,y=ALTAR_Y+1})
     game:frames(1)
     return eggplant
 end
@@ -517,31 +562,53 @@ scenario("a Present broken away from Kali's altar delivers nothing",function(gam
     expect(#game:spawned_of("ITEM_PRESENT")==2,"no fresh Present was offered on the next altar level")
 end,{CHECK_KALI_PRESENT="REWARD_CLONE_GUN"})
 
--- The Present is sacrificed while an ordinary gift's replacement is pending,
--- so its Eggplant is new at the altar when the first-gift scan runs.
-scenario("Kali's first gift never claims a sacrificed Present's Eggplant",function(game)
+local function expect_both_altar_rewards(game,gift,eggplant)
+    game:frames(5)
+    local gift_rewards,present_rewards=game:spawned_of("ITEM_JETPACK"),game:spawned_of("ITEM_CLONEGUN")
+    expect(not game:entity(gift) and #gift_rewards==1,"the ordinary gift was not delivered as the first altar reward")
+    expect(not game:entity(eggplant) and #present_rewards==1,"the Present's Eggplant was not delivered as the Present reward")
+    expect(present_rewards[1].x==ALTAR_X and present_rewards[1].y==ALTAR_Y+1,"the Present reward is not where its Eggplant was")
+    expect(game:entity(gift_rewards[1].uid),"the first altar reward was removed")
+    expect(game:entity(present_rewards[1].uid),"the Present reward was removed by the first-gift scan")
+end
+
+-- The first-gift scan runs before the Present scan in the same frame, so the
+-- Present's reward appears inside the first gift's clean-up window.
+scenario("Kali's first gift and a same-frame Present each keep their reward (first-gift scan first)",function(game)
     altar_level(game,2,{{"MONS_PET_CAT",x=5,y=6}})
     local present=kali_present(game)
     local gift=kali_gift(game,1,{"ITEM_PICKUP_ROPEPILE"})
     local eggplant=sacrifice(game,present)
-    expect(game:materialized("CHECK_KALI_ALTAR_1"),"the first gift was not replaced")
-    expect(not game:entity(gift) and #game:spawned_of("ITEM_JETPACK")==1,"the ordinary gift was not delivered as the first altar reward")
+    expect(game:materialized("CHECK_KALI_ALTAR_1") and game:materialized("CHECK_KALI_PRESENT"),"the two scans did not both run in the same frame")
+    expect_both_altar_rewards(game,gift,eggplant)
+end,{CHECK_KALI_PRESENT="REWARD_CLONE_GUN",CHECK_KALI_ALTAR_1="REWARD_JETPACK"})
+
+-- The Present scan replaces the Eggplant earlier in the frame the first-gift
+-- scan runs, so the Present's reward is new at the altar for that scan.
+scenario("Kali's first gift and a same-frame Present each keep their reward (Present scan first)",function(game)
+    altar_level(game,2,{{"MONS_PET_CAT",x=5,y=6}})
+    offer_present(game,kali_present(game))
+    local gift=kali_gift(game,1,{"ITEM_PICKUP_ROPEPILE"})
+    local eggplant=kali_emit(game,{"ITEM_EGGPLANT"})[1]
     game:frames(1)
-    local rewards=game:spawned_of("ITEM_CLONEGUN")
-    expect(not game:entity(eggplant) and #rewards==1,"the Present's Eggplant was not delivered as the Present reward")
-    expect(rewards[1].x==ALTAR_X and rewards[1].y==ALTAR_Y+1 and game:entity(rewards[1].uid),"the Present reward is not where its Eggplant was")
+    expect(game:materialized("CHECK_KALI_ALTAR_1") and game:materialized("CHECK_KALI_PRESENT"),"the two scans did not both run in the same frame")
+    expect_both_altar_rewards(game,gift,eggplant)
 end,{CHECK_KALI_PRESENT="REWARD_CLONE_GUN",CHECK_KALI_ALTAR_1="REWARD_JETPACK"})
 
 -- Regression for 7c6f992: the first altar check fired only on the counter's
--- first increase, so a Present sacrificed first used it up.
+-- first increase, so a Present sacrificed first used it up. The sacrifice
+-- raises the counter, so the first-gift scan runs beside the Present's reward.
 scenario("Kali's first altar check is still awarded after the Present",function(game)
     altar_level(game,2,{{"MONS_PET_CAT",x=5,y=6}})
-    sacrifice(game,kali_present(game))
+    sacrifice(game,kali_present(game),1)
     game:frames(5)
-    expect(#game:spawned_of("ITEM_CLONEGUN")==1,"the Present reward was not delivered")
+    local rewards=game:spawned_of("ITEM_CLONEGUN")
+    expect(#rewards==1,"the Present reward was not delivered")
+    expect(game:entity(rewards[1].uid),"the first-gift scan took or removed the Present reward")
+    expect(not game:materialized("CHECK_KALI_ALTAR_1") and #game:spawned_of("ITEM_JETPACK")==0,"the Present sacrifice used up the first altar check")
 
     altar_level(game,3)
-    local gift=kali_gift(game,1,{"ITEM_PICKUP_ROPEPILE"})
+    local gift=kali_gift(game,2,{"ITEM_PICKUP_ROPEPILE"})
     game:frames(1)
     expect(not game:entity(gift) and #game:spawned_of("ITEM_JETPACK")==1,"the first altar check was not awarded after the Present")
 end,{CHECK_KALI_PRESENT="REWARD_CLONE_GUN",CHECK_KALI_ALTAR_1="REWARD_JETPACK"})

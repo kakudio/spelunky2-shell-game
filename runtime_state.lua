@@ -9,6 +9,7 @@ local LEVEL_TABLES={
     "moon_bows", "moon_hidden_bows",
     "sun_challenge_bags",
     "duat_recovery_seen_items",
+    "placed_rewards",
 }
 
 function M.new(randomizer_state, initialize, log, is_kali_item_recovery_enabled, is_balanced_duat_kali_rewards_enabled, is_true_crown_restoration_enabled)
@@ -16,7 +17,7 @@ function M.new(randomizer_state, initialize, log, is_kali_item_recovery_enabled,
         randomizer_state=randomizer_state,
         quillback_hooks={}, beg_hooks={}, anubis_hooks={}, queen_bee_hooks={},
         humphead_hooks={}, yeti_hooks={}, lahamu_hooks={}, vlad_hooks={}, tiamat_hooks={}, eggplant_king_hooks={},
-        pending_yeti_drops={}, spawn_replacements={}, moon_bows={}, moon_hidden_bows={}, sun_challenge_bags={},
+        pending_yeti_drops={}, spawn_replacements={}, placed_rewards={}, moon_bows={}, moon_hidden_bows={}, sun_challenge_bags={},
         lahamu_diagnostic_logged=false,
         moon_handoff_spawning=false, kali_last_gifts=nil, kali_known_items={}, kali_first_gift_completed=false, kali_second_gift_completed=false,
         kali_presents={}, kali_present_source_placed=false, kali_present_completed=false,
