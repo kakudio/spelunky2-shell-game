@@ -91,7 +91,7 @@ Access options via Modlunky 2's options menu or Overlunky (F8) → Options:
 ## Reporting an Issue
 
 Leave **Generate Spoiler** and **Generate Logs** enabled, then follow
-[Report a bug](https://kakudio.dev/bug-report/) on the Kakudio website: it
+[Report a bug](https://kakudio.github.io/bug-report/) on the Kakudio website: it
 covers downloading `kakudio-bug-reporter.exe` (attached to every Shell Game
 release), getting past Windows SmartScreen, and reporting without the app.
 
