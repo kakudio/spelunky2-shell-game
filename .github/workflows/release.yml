@@ -31,34 +31,15 @@ jobs:
             exit 1
           fi
 
-      - name: Download bug reporter
-        env:
-          REPORTER_DOWNLOAD_URL: ${{ vars.REPORTER_DOWNLOAD_URL }}
-        run: |
-          if [ -z "$REPORTER_DOWNLOAD_URL" ]; then
-            echo "::error::Repository variable REPORTER_DOWNLOAD_URL is not set."
-            exit 1
-          fi
-          mkdir -p dist/reporter
-          curl --fail --silent --show-error --location --retry 3 \
-            --output dist/reporter/kakudio-bug-reporter.exe "$REPORTER_DOWNLOAD_URL"
-          if [ ! -s dist/reporter/kakudio-bug-reporter.exe ]; then
-            echo "::error::Reporter downloaded from $REPORTER_DOWNLOAD_URL is empty."
-            exit 1
-          fi
-          echo "Downloaded $(stat -c %s dist/reporter/kakudio-bug-reporter.exe) bytes, SHA-256 $(sha256sum dist/reporter/kakudio-bug-reporter.exe | cut -d' ' -f1)"
-
       - name: Download release archive
         uses: actions/download-artifact@v4
         with:
           name: ShellGame
           path: dist/release
 
-      - name: Create GitHub release and upload assets
+      - name: Create GitHub release and upload archive
         uses: softprops/action-gh-release@v2
         with:
           generate_release_notes: true
-          files: |
-            dist/release/ShellGame.zip
-            dist/reporter/kakudio-bug-reporter.exe
+          files: dist/release/ShellGame.zip
           fail_on_unmatched_files: true

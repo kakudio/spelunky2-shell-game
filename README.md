@@ -90,18 +90,18 @@ Access options via Modlunky 2's options menu or Overlunky (F8) → Options:
 
 ## Reporting an Issue
 
-Leave **Generate Spoiler** and **Generate Logs** enabled, then follow
-[Report a bug](https://kakudio.github.io/bug-report/) on the Kakudio website: it
-covers downloading `kakudio-bug-reporter.exe` (attached to every Shell Game
-release), getting past Windows SmartScreen, and reporting without the app.
+To report a problem, use the Kakudio website's
+[bug-reporting page](https://kakudio.github.io/bug-report/).
 
-At the start of every run, the mod writes one report to the `run_reports/`
-folder in its data folder; for an install extracted from `ShellGame.zip`, that
-is `Mods/Data/ShellGame/run_reports/`. Either option can create that same file,
-containing its enabled section(s); with both enabled, it includes the
-randomizer seed, the game adventure seed, the full spoiler mapping, and all
-Shell Game logs. To report by hand, attach the newest `.txt` file there. Use
-`kir_report_path()` in the Overlunky console to print the current report's
+Leave **Generate Spoiler** and **Generate Logs** enabled. At the start of every
+run, the mod writes one report to the `run_reports/` folder in its data folder;
+for an install extracted from `ShellGame.zip`, that is
+`Mods/Data/ShellGame/run_reports/`.
+Either option can create that same file, containing its enabled section(s).
+The newest `.txt` file there is the one to send with your report; with both
+enabled, it includes the randomizer seed, the game adventure seed, the full
+spoiler mapping, and all Shell Game logs.
+Use `kir_report_path()` in the Overlunky console to print the current report's
 location. The mod retains the newest 30 reports and deletes older reports
 automatically.
 
@@ -181,7 +181,7 @@ A pull request that adds or changes a check's adapter includes a stand-in scenar
 
 ## Releasing
 
-GitHub automatically packages the mod and publishes `ShellGame.zip` (the release variant) when a version tag is pushed, alongside `kakudio-bug-reporter.exe` as a separate asset. Update `mod.json` first, commit it, then create and push a matching tag:
+GitHub automatically packages the mod and publishes `ShellGame.zip` (the release variant) when a version tag is pushed. Update `mod.json` first, commit it, then create and push a matching tag:
 
 ```powershell
 git tag v0.1.0
@@ -189,8 +189,6 @@ git push origin v0.1.0
 ```
 
 The tag must exactly match the `version` in `mod.json` (for example, `0.1.0` requires `v0.1.0`). Every run of the release workflow also saves the developer variant as the `ShellGame-dev` workflow artifact; it is never attached to the release. A manual run from the Actions page saves both variants as workflow artifacts (`ShellGame` and `ShellGame-dev`) without publishing a release.
-
-The release's `kakudio-bug-reporter.exe` is whatever build the report service serves when the tag is built, downloaded from the repository variable `REPORTER_DOWNLOAD_URL` (`https://bug-reports.kakudio.workers.dev/download/kakudio-bug-reporter.exe`). If that variable is unset or the download fails, the tag push fails and publishes nothing.
 
 Every pull request and push to `main` packages both variants with the same script and saves them as `ShellGame` and `ShellGame-dev` artifacts on its **Tests** run. A pull request's builds are stamped with the pull request's head commit, not the merge commit GitHub tests against.
 
