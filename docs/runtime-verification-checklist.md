@@ -16,7 +16,7 @@ The following adapters also need one in-game test whenever their code changes:
 | --- | --- | --- |
 | Player-owned source guard | Carry a shuffled item through a route transition. | The item remains owned; console says `Ignored player_carried source` only if a scan sees it. |
 | Moon Challenge | Enter Jungle or Volcana Moon Challenge; also enter Volcana carrying a Bow. | Native back-layer Bow is replaced; a carried foreground Bow remains unchanged. |
-| Excalibur Stone | Visit Tide Pool with Crown/Hedjet, then enter Tide Pool holding Excalibur. | Stone reward is shuffled; carried Excalibur remains untouched. |
+| Excalibur Stone | Reach Tide Pool 4-2 wearing a Hedjet from a randomized reward; repeat with a Crown, and with the developer test resources' Crown. Also put one on partway through 4-2, and arrive wearing neither. Carry Excalibur in once. | Wearing either on arrival, or once one is put on in 4-2, the stone becomes its mapped reward; wearing neither, it stays native and `Excalibur gate is closed` is logged; a carried Excalibur remains untouched. |
 | Kali Altar 1 | Earn Kali's first normal reward, die, then repeat on a new run. | The check rewards on both runs; log includes `Kali first-gift candidate`. |
 | Kali Present | Read its target group in `kir_spoiler()`, then find the first level at or after that group with both Kali and a pet. | The pet becomes a Present once; its mapped reward appears at the altar. |
 | Kali Altar 2 | Earn Kapala. | `DROP.ALTAR_KAPALA` is replaced by the mapped reward. |
@@ -25,7 +25,7 @@ The following adapters also need one in-game test whenever their code changes:
 | Quillback | Kill Quillback with a seed mapping it to Eggplant. | Eggplant is placed directly into the active player's hands rather than breaking as a drop. |
 | DROP-table Eggplant | Test a DROP-table reward (for example Kingu) mapped to Eggplant. | Confirm its game-specific adapter; no global Eggplant listener is used, since unrelated native Eggplants must remain untouched. |
 | Black Market | Reach the Black Market and buy the Hedjet slot. | The mapped reward remains a purchasable shop item. |
-| Tusk Dice House | Win the fifth prize. | Only the fifth prize is replaced. |
+| Tusk Dice House | Win the fifth prize, then take whatever the dispenser offers next. | Only the fifth prize is replaced. In the run report, `Dice House item #1`–`#4` each say `left native: prize count is N, not 4`, and `Dice House prize count N -> N+1` follows each win. `Dice House item #5 … (prize count 4) replaced with <reward>` names the native prize it replaced, beside `CHECK CHECK_TUSK_DICE_HOUSE -> <reward>`. Anything staged after it (a sixth prize, the VIP invitation) is logged as `item #6`+ with `already materialized`. If item #5 is logged at another count, or a later item is the one replaced, the staging model is wrong. |
 | Mothership Plasma Cannon | Reach the Ice Caves Mothership back layer. | Only its back-layer Plasma Cannon is replaced. |
 | Lahamu | Defeat Lahamu in the Mothership. | The mapped reward appears at Lahamu's death position; forcefields still disable normally. |
 | True Crown recovery | Complete Beg's True Crown check while cursed and below four health; repeat while uncursed. | A cursed player is cured and restored to at least 4 HP; uncursed players' health is unchanged. |

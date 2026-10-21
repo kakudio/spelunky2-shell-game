@@ -29,6 +29,13 @@ local REWARD_ENTITY_NAMES = {
 
 function M.type_of(name) return ENT_TYPE and ENT_TYPE[name] or nil end
 
+function M.name_of(entity_type)
+    for name,id in pairs(ENT_TYPE or {}) do
+        if id==entity_type then return name end
+    end
+    return tostring(entity_type)
+end
+
 function M.reward_type(randomizer_state, check_id)
     local reward=randomizer_state.mapping and randomizer_state.mapping[check_id]
     return reward, reward and M.type_of(REWARD_ENTITY_NAMES[reward]) or nil

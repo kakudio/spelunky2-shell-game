@@ -95,6 +95,12 @@ local function grant_test_item(player,entity_type,label)
     if uid then pick_up(player.uid,uid); log("Granted test "..label.." to player uid "..player.uid) end
     return uid~=nil
 end
+local function grant_test_powerup(player,powerup_type,label)
+    if not powerup_type or player:has_powerup(powerup_type) then return false end
+    player:give_powerup(powerup_type)
+    log("Granted test "..label.." to player uid "..player.uid)
+    return true
+end
 local function grant_test_scepter(player)
     local scepter_type=ENT_TYPE.ITEM_SCEPTER
     if not scepter_type then return false end
@@ -263,7 +269,7 @@ set_callback(function()
             -- hooks (the Udjat hook would otherwise turn this Eye into its mapped reward).
             grant_test_item(player,ENT_TYPE.ITEM_PICKUP_UDJATEYE,"Udjat Eye")
             grant_test_item(player,ENT_TYPE.ITEM_PICKUP_ANKH,"Ankh")
-            grant_test_item(player,ENT_TYPE.ITEM_PICKUP_CROWN,"Crown")
+            grant_test_powerup(player,ENT_TYPE.ITEM_POWERUP_CROWN,"Crown")
             grant_test_item(player,ENT_TYPE.ITEM_PICKUP_SKELETON_KEY,"Skeleton Key")
             grant_test_item(player,ENT_TYPE.ITEM_PICKUP_SPECIALCOMPASS,"Alien Compass")
             grant_test_floor_item(player,ENT_TYPE.ITEM_PICKUP_TABLETOFDESTINY,"Tablet of Destiny")
