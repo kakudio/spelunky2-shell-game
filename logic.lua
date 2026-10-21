@@ -391,7 +391,14 @@ function M.generate(seed)
                     end
                 end
             end
-            for i,check_id in ipairs(remaining_checks) do map[check_id]=fill_reward(i) end
+            -- Where no swap was found, the attempt fails rather than ship a
+            -- check that holds its own requirement.
+            for i,check_id in ipairs(remaining_checks) do
+                map[check_id]=fill_reward(i)
+                if reward_is_requirement(check_by_id(check_id),map[check_id]) then placed=false end
+            end
+        end
+        if placed then
             local ok, result=M.validate(map)
             if ok then result.stars_mobility=stars_mobility; return map, result end
         end
