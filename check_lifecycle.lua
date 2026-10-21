@@ -26,6 +26,14 @@ function M:fail(check, detail)
     self.log("CHECK "..check.." failed: "..detail)
 end
 
+-- The check's mapped reward is what the game already places there, so the
+-- native source is handed to the game untouched. Neither materialized nor
+-- failed: nothing was spawned, and nothing went wrong.
+function M:leave_native(check, detail)
+    self:mark(check,"left_native",detail)
+    self.log("CHECK "..check.." "..detail)
+end
+
 function M:defer(frames, label, callback)
     local epoch=self.epoch
     self.schedule(function()
@@ -38,12 +46,13 @@ function M:defer(frames, label, callback)
 end
 
 function M:summary()
-    local materialized,failed=0,0
+    local materialized,failed,left_native=0,0,0
     for _,entry in pairs(self.states) do
         if entry.state=="materialized" then materialized=materialized+1 end
         if entry.state=="failed" then failed=failed+1 end
+        if entry.state=="left_native" then left_native=left_native+1 end
     end
-    return self.epoch,materialized,failed,self.failures
+    return self.epoch,materialized,failed,self.failures,left_native
 end
 
 return M

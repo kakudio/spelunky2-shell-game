@@ -354,6 +354,59 @@ scenario("Excalibur fails its check once its retries are exhausted",function(gam
     expect(#game.spawned==0,"a reward was spawned without a sword")
 end,{CHECK_EXCALIBUR_STONE="REWARD_ANKH"})
 
+local EXCALIBUR_LEFT_NATIVE="CHECK CHECK_EXCALIBUR_STONE maps to its native reward REWARD_EXCALIBUR; left native"
+
+local function count_logged(game,message)
+    local count=0
+    for _,logged in ipairs(game.logs) do
+        if logged==message then count=count+1 end
+    end
+    return count
+end
+
+local function expect_excalibur_left_native(game,sword)
+    expect(game:entity(sword.uid),"the native sword-in-stone was removed")
+    expect(sword.abs_x==31 and sword.abs_y==44,"the native sword-in-stone was moved")
+    expect(#game.spawned==0,"a reward was spawned for a stone mapped to its own Excalibur")
+    local entry=game.ctx.lifecycle.states.CHECK_EXCALIBUR_STONE
+    expect(entry and entry.state=="left_native","the check was not recorded as left native")
+    expect(not game.ctx.lifecycle.failures.CHECK_EXCALIBUR_STONE,"a left-native stone was reported as failed")
+    expect(count_logged(game,EXCALIBUR_LEFT_NATIVE)==1,"the left-native stone was not logged exactly once")
+    expect(#game.timeouts==0,"an Excalibur retry was scheduled for a left-native stone")
+end
+
+scenario("Excalibur's stone stays native when it maps to Excalibur and a player arrives wearing a Crown",function(game)
+    game:wear(game:add_player{x=1,y=1},"ITEM_POWERUP_CROWN")
+    local sword=excalibur_level(game)[1]
+    game:frames(200)
+    expect_excalibur_left_native(game,sword)
+    local _,materialized,failed,_,left_native=game.ctx.lifecycle:summary()
+    expect(materialized==0 and failed==0 and left_native==1,"the lifecycle summary did not count the stone as left native")
+    expect(not game:logged("Excalibur gate"),"the gate was consulted for a left-native stone")
+end,{CHECK_EXCALIBUR_STONE="REWARD_EXCALIBUR"})
+
+scenario("Excalibur's stone stays native when it maps to Excalibur and a Hedjet is first worn partway through 4-2",function(game)
+    local player=game:add_player{x=1,y=1}
+    local sword=excalibur_level(game)[1]
+    game:frames(60)
+    game:wear(player,"ITEM_POWERUP_HEDJET")
+    game:frames(200)
+    game:fire(ON.START)
+    game.checks.replace_excalibur_if_gated(game.ctx)
+    expect_excalibur_left_native(game,sword)
+end,{CHECK_EXCALIBUR_STONE="REWARD_EXCALIBUR"})
+
+scenario("Excalibur's left-native stone is logged once per visit to 4-2",function(game)
+    excalibur_level(game)
+    game:frames(20)
+    excalibur_level(game,3)
+    game:frames(20)
+    local sword=excalibur_level(game)[1]
+    game:frames(20)
+    expect(count_logged(game,EXCALIBUR_LEFT_NATIVE)==2,"the left-native stone was not logged once per 4-2 visit")
+    expect(game:entity(sword.uid) and #game.spawned==0,"a revisited 4-2 replaced the native sword")
+end,{CHECK_EXCALIBUR_STONE="REWARD_EXCALIBUR"})
+
 local ALTAR_X,ALTAR_Y=20,10
 
 -- A Dwelling level with a Kali altar; the run's player stands beside it.

@@ -625,8 +625,18 @@ local function yang_position(ctx, yang)
     return nil
 end
 
+local EXCALIBUR_BASE_REWARD
+for _,check in ipairs(logic.CHECKS) do
+    if check.id=="CHECK_EXCALIBUR_STONE" then EXCALIBUR_BASE_REWARD=check.base_reward end
+end
+
+local function excalibur_left_native(ctx)
+    local entry=ctx.lifecycle.states.CHECK_EXCALIBUR_STONE
+    return entry~=nil and entry.state=="left_native"
+end
+
 local function in_excalibur_level(ctx)
-    return state.theme==THEME.TIDE_POOL and state.level==2 and not ctx.randomizer_state.level_materialized.CHECK_EXCALIBUR_STONE
+    return state.theme==THEME.TIDE_POOL and state.level==2 and not ctx.randomizer_state.level_materialized.CHECK_EXCALIBUR_STONE and not excalibur_left_native(ctx)
 end
 
 -- The sword-in-stone can appear after POST_LEVEL_GENERATION, while a test
@@ -636,6 +646,13 @@ function M.replace_excalibur_if_gated(ctx, attempt)
     -- Excalibur's stone only exists in Tide Pool 4-2. Restricting this avoids
     -- scanning player-carried swords (and retrying) on Tide Pool 4-1/4-3.
     if not in_excalibur_level(ctx) then return end
+    -- A stone mapped to its own Excalibur is the game's: its pickup already
+    -- obeys the Hedjet/Crown rule, so replacing it would only loosen the sword.
+    -- Decide from the mapping before the gate, so no entry point touches it.
+    if placements.reward_type(ctx.randomizer_state,"CHECK_EXCALIBUR_STONE")==EXCALIBUR_BASE_REWARD then
+        ctx.lifecycle:leave_native("CHECK_EXCALIBUR_STONE","maps to its native reward "..EXCALIBUR_BASE_REWARD.."; left native")
+        return
+    end
     local has_crown=players_wear_any({"ITEM_POWERUP_CROWN"})
     local has_hedjet=players_wear_any({"ITEM_POWERUP_HEDJET"})
     if not (has_crown or has_hedjet) then
