@@ -85,6 +85,59 @@ local function mapping_tests()
     return true
 end
 
+local STARS_CHECKS={CHECK_STARS_CHALLENGE_TIDE_POOL="LOCATION_TIDE_POOL", CHECK_STARS_CHALLENGE_TEMPLE="LOCATION_TEMPLE"}
+
+local function stars_check_reached(map,check_id)
+    for _,early in ipairs({"LOCATION_JUNGLE","LOCATION_VOLCANA"}) do
+        if logic.solve(map,{early=early,mid=STARS_CHECKS[check_id]}).visited[check_id] then return true end
+    end
+    return false
+end
+
+local function stars_tests()
+    local stars={}
+    for _,reward in ipairs(logic.STARS_MOBILITY_REWARDS) do stars[reward]=true end
+    if not stars.REWARD_HOVERPACK then return false,"Hoverpack is not a Stars mobility reward" end
+    for _,check in ipairs(logic.CHECKS) do
+        if STARS_CHECKS[check.id] and check.any_of~=logic.STARS_MOBILITY_REWARDS then
+            return false,check.id.." does not require the shared Stars mobility list"
+        end
+    end
+    -- Every option is picked as the guaranteed item somewhere, placed early,
+    -- and no option is ever placed at a check it opens.
+    local picked,hoverpack_seed={},nil
+    for seed=1,200 do
+        local map,route=logic.generate(seed)
+        local pick=route.stars_mobility
+        if not stars[pick] then return false,"no guaranteed Stars mobility reward at seed "..seed end
+        picked[pick]=true
+        if pick=="REWARD_HOVERPACK" and not hoverpack_seed then hoverpack_seed=seed end
+        for check_id,reward in pairs(map) do
+            if STARS_CHECKS[check_id] and stars[reward] then return false,reward.." placed at "..check_id.." at seed "..seed end
+            if reward==pick and logic.check_group(check_id,seed)>2 then return false,pick.." not placed early at seed "..seed end
+        end
+    end
+    for reward in pairs(stars) do
+        if not picked[reward] then return false,reward.." was never the guaranteed Stars item" end
+    end
+    -- With the Hoverpack as the only Stars item in play, both Stars checks are
+    -- reachable; without it, neither is.
+    local map=logic.generate(hoverpack_seed)
+    for check_id,reward in pairs(map) do
+        if stars[reward] and reward~="REWARD_HOVERPACK" then map[check_id]="NONE" end
+    end
+    for check_id in pairs(STARS_CHECKS) do
+        if not stars_check_reached(map,check_id) then return false,"Hoverpack alone did not open "..check_id end
+    end
+    for check_id,reward in pairs(map) do
+        if reward=="REWARD_HOVERPACK" then map[check_id]="NONE" end
+    end
+    for check_id in pairs(STARS_CHECKS) do
+        if stars_check_reached(map,check_id) then return false,check_id.." opened with no Stars mobility reward" end
+    end
+    return true
+end
+
 local function lifecycle_tests()
     local messages={}
     local scheduled=nil
@@ -114,6 +167,8 @@ function M.run(fuzz_count)
     if not ok then return false,"policy: "..message end
     ok,message=mapping_tests()
     if not ok then return false,"mapping: "..message end
+    ok,message=stars_tests()
+    if not ok then return false,"stars: "..message end
     ok,message=lifecycle_tests()
     if not ok then return false,"lifecycle: "..message end
     return logic.self_test(fuzz_count or 100,1)

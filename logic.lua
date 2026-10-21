@@ -3,7 +3,7 @@
 -- validator can be exercised from the in-game console and reviewed in isolation.
 
 local M = {}
-M.LOGIC_VERSION = 25
+M.LOGIC_VERSION = 26
 
 M.LOCATIONS = {
     LOCATION_DWELLING = { parents = {} },
@@ -25,6 +25,11 @@ M.LOCATIONS = {
     LOCATION_HUNDUN = { parents = { "LOCATION_SUNKEN_CITY" } },
     LOCATION_NONE = { parents = {} },
 }
+
+-- Any one of these opens both Stars Challenge checks, which reference this
+-- table directly. Exactly one is selected per seed as the guaranteed early
+-- mobility reward for the gate; the others remain normal pool items.
+M.STARS_MOBILITY_REWARDS={"REWARD_CAPE","REWARD_VLADS_CAPE","REWARD_JETPACK","REWARD_HOVERPACK"}
 
 -- `locations` is used only for the Sisters reward, which needs both Jungle and Olmec.
 M.CHECKS = {
@@ -51,8 +56,8 @@ M.CHECKS = {
     { id="CHECK_ALIEN_COMPASS", location="LOCATION_TEMPLE", layer="BACKGROUND", all_of={"CHECK_VAN_HORSING_RESCUE","CHECK_VLAD"}, base_reward="REWARD_ALIEN_COMPASS" },
     { id="CHECK_OSIRIS", location="LOCATION_DUAT", layer="BACKGROUND", all_of={"REWARD_SCEPTER","REWARD_ANKH"}, any_of={"REWARD_HEDJET","REWARD_CROWN"}, base_reward="REWARD_TABLET_OF_DESTINY" },
     { id="CHECK_ANUBIS_II", location="LOCATION_DUAT", layer="BACKGROUND", all_of={"REWARD_SCEPTER","REWARD_ANKH"}, any_of={"REWARD_HEDJET","REWARD_CROWN"}, base_reward="REWARD_JETPACK" },
-    { id="CHECK_STARS_CHALLENGE_TIDE_POOL", location="LOCATION_TIDE_POOL", layer="BACKGROUND", any_of={"REWARD_CAPE","REWARD_VLADS_CAPE","REWARD_JETPACK"}, base_reward="REWARD_CLONE_GUN" },
-    { id="CHECK_STARS_CHALLENGE_TEMPLE", location="LOCATION_TEMPLE", layer="BACKGROUND", any_of={"REWARD_CAPE","REWARD_VLADS_CAPE","REWARD_JETPACK"}, base_reward="REWARD_ELIXIR" },
+    { id="CHECK_STARS_CHALLENGE_TIDE_POOL", location="LOCATION_TIDE_POOL", layer="BACKGROUND", any_of=M.STARS_MOBILITY_REWARDS, base_reward="REWARD_CLONE_GUN" },
+    { id="CHECK_STARS_CHALLENGE_TEMPLE", location="LOCATION_TEMPLE", layer="BACKGROUND", any_of=M.STARS_MOBILITY_REWARDS, base_reward="REWARD_ELIXIR" },
     { id="CHECK_YETI_QUEEN", location="LOCATION_ICE_CAVES", layer="BACKGROUND", base_reward="REWARD_SPIKE_SHOES" },
     { id="CHECK_YETI_KING", location="LOCATION_ICE_CAVES", layer="BACKGROUND", base_reward="REWARD_COMPASS" },
     { id="CHECK_LAHAMU", location="LOCATION_ICE_CAVES", layer="BACKGROUND", all_of={"REWARD_ALIEN_COMPASS"}, base_reward="NONE" },
@@ -113,10 +118,6 @@ M.CHECK_GROUPS = {
     CHECK_TIAMAT=7, CHECK_SUN_CHALLENGE=7, CHECK_SUN_CHALLENGE_SUPPLIES=7, CHECK_EGGPLANT_KING=7,
 }
 
--- Exactly one of these is selected per seed as the guaranteed early mobility
--- reward for the Stars Challenge gate. The other two remain normal pool items.
-M.STARS_MOBILITY_REWARDS={"REWARD_CAPE","REWARD_VLADS_CAPE","REWARD_JETPACK"}
-
 -- Taking the special Tusk Idol through any exit advances Sparrow into the
 -- second half of her quest. It must therefore appear after Sparrow's first
 -- encounter window (groups 1-2) but before the group-7 endgame checks.
@@ -156,7 +157,7 @@ local function add_group_requirement(deadlines, values, group)
     local deadline=math.max(1,group-1)
     for _,value in ipairs(values or {}) do
         -- The Stars gate needs any one mobility reward. Keep its existing
-        -- one-per-seed behavior rather than forcing all three early merely
+        -- one-per-seed behavior rather than forcing all of them early merely
         -- because this summary takes a union of requirement alternatives.
         if value:sub(1,7)=="REWARD_" and not is_stars_mobility_reward(value) and (not deadlines[value] or deadline<deadlines[value]) then
             deadlines[value]=deadline
@@ -374,12 +375,25 @@ function M.generate(seed)
             for _, check in ipairs(shuffled(M.CHECKS,next_int)) do if check.shuffle~=false and not used_check[check.id] then table.insert(remaining_checks,check.id) end end
             for _, reward in ipairs(shuffled(M.REWARDS,next_int)) do if not used_reward[reward] then table.insert(fill_rewards,reward) end end
             local overflow=shuffled(M.OVERFLOW_REWARDS,next_int)
-            for i,check_id in ipairs(remaining_checks) do
-                -- Each pass uses each option once, keeping counts within one.
-                map[check_id]=fill_rewards[i] or overflow[((i-#fill_rewards-1)%#overflow)+1]
+            -- Each pass uses each option once, keeping counts within one.
+            local function fill_reward(i) return fill_rewards[i] or overflow[((i-#fill_rewards-1)%#overflow)+1] end
+            -- A fill reward may be a requirement too (an unpicked Stars
+            -- mobility reward). Swapping checks keeps the same rewards in play
+            -- while keeping each one away from a check it opens.
+            for i=1,#remaining_checks do
+                if reward_is_requirement(check_by_id(remaining_checks[i]),fill_reward(i)) then
+                    for k=1,#remaining_checks do
+                        if k~=i and not reward_is_requirement(check_by_id(remaining_checks[k]),fill_reward(i))
+                            and not reward_is_requirement(check_by_id(remaining_checks[i]),fill_reward(k)) then
+                            remaining_checks[i],remaining_checks[k]=remaining_checks[k],remaining_checks[i]
+                            break
+                        end
+                    end
+                end
             end
+            for i,check_id in ipairs(remaining_checks) do map[check_id]=fill_reward(i) end
             local ok, result=M.validate(map)
-            if ok then return map, result end
+            if ok then result.stars_mobility=stars_mobility; return map, result end
         end
     end
     error("could not construct a valid grouped mapping for seed "..tostring(seed))
@@ -400,6 +414,7 @@ function M.self_test(count, first_seed)
             if seen[reward] and not is_overflow then return false, "duplicate reward "..reward.." at seed "..seed end
             seen[reward]=true
             if second[check_id] ~= reward then return false, "nondeterministic mapping at seed "..seed end
+            if reward_is_requirement(check_by_id(check_id),reward) then return false, check_id.." holds its own requirement "..reward.." at seed "..seed end
         end
         local shuffled_check_count=0
         for _,check in ipairs(M.CHECKS) do if check.shuffle~=false then shuffled_check_count=shuffled_check_count+1 end end
