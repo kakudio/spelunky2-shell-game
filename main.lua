@@ -340,8 +340,8 @@ register_console_command("kir_spoiler",function()
 end)
 register_console_command("kir_status",function()
     initialize()
-    local epoch,materialized,failed,failures=runtime_context.lifecycle:summary()
-    print(string.format("[KIR] seed=%d logic=%d mapping=%s level_epoch=%d materialized=%d failures=%d",randomizer_state.seed,logic.LOGIC_VERSION,randomizer_state.mapping and "ready" or "missing",epoch,materialized,failed))
+    local epoch,materialized,failed,failures,left_native=runtime_context.lifecycle:summary()
+    print(string.format("[KIR] seed=%d logic=%d mapping=%s level_epoch=%d materialized=%d left_native=%d failures=%d",randomizer_state.seed,logic.LOGIC_VERSION,randomizer_state.mapping and "ready" or "missing",epoch,materialized,left_native,failed))
     local sparrow_state=state.quests and state.quests.sparrow_state
     print(string.format("[KIR] Sparrow quest state=%s; last observed transition=%s",tostring(sparrow_state),runtime_context.sparrow_last_transition and (tostring(runtime_context.sparrow_last_transition.from).." -> "..tostring(runtime_context.sparrow_last_transition.to)) or "none"))
     for check,detail in pairs(failures) do print("[KIR] FAILED "..check..": "..detail) end
