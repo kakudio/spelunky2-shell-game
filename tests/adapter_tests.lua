@@ -296,16 +296,37 @@ scenario("Excalibur's gate opens once a player first wears a Hedjet partway thro
     expect(#game.spawned==1,"the check materialized more than once")
 end,{CHECK_EXCALIBUR_STONE="REWARD_ANKH"})
 
-scenario("Excalibur's gate stays closed unless a player wears a Crown or Hedjet",function(game)
+scenario("Excalibur's gate opens when a player arrives wearing an Eggplant Crown",function(game)
+    game:wear(game:add_player{x=1,y=1},"ITEM_POWERUP_EGGPLANTCROWN")
+    local sword=excalibur_level(game)[1]
+    game:frames(10)
+    expect(not game:entity(sword.uid),"the sword-in-stone was not removed")
+    expect_spawn(game,"ITEM_PICKUP_ANKH",31,44,LAYER.FRONT,"the mapped reward was not placed at the sword's absolute position")
+    expect(game:logged("Excalibur gate is open (Crown=false, Hedjet=false, Eggplant Crown=true); found 1 sword-in-stone entities"),"the open gate did not report the Eggplant Crown")
+end,{CHECK_EXCALIBUR_STONE="REWARD_ANKH"})
+
+scenario("Excalibur's gate opens once a player first wears an Eggplant Crown partway through Tide Pool 4-2",function(game)
+    local player=game:add_player{x=1,y=1}
+    local sword=excalibur_level(game)[1]
+    game:frames(60)
+    expect(game:entity(sword.uid),"the sword was replaced before any player wore a crown")
+    game:wear(player,"ITEM_POWERUP_EGGPLANTCROWN")
+    game:frames(1)
+    expect(not game:entity(sword.uid),"the sword was not replaced once a player wore an Eggplant Crown in 4-2")
+    expect_spawn(game,"ITEM_PICKUP_ANKH",31,44,LAYER.FRONT,"the mapped reward was not placed at the sword")
+end,{CHECK_EXCALIBUR_STONE="REWARD_ANKH"})
+
+scenario("Excalibur's gate stays closed unless a player wears a Crown, Hedjet or Eggplant Crown",function(game)
     game:place("ITEM_PICKUP_ANKH",{holder=game:add_player{x=1,y=1}})
     local sword=excalibur_level(game,2,{
         {"ITEM_EXCALIBUR",x=0.5,y=1,abs_x=31,abs_y=44},
         {"ITEM_PICKUP_CROWN",x=8,y=8},
         {"ITEM_PICKUP_HEDJET",x=9,y=8},
+        {"ITEM_PICKUP_EGGPLANTCROWN",x=10,y=8},
     })[1]
     game:frames(200)
-    expect(game:entity(sword.uid) and #game.spawned==0,"the sword was replaced with no Crown or Hedjet worn")
-    expect(game:logged("Excalibur gate is closed: no player wears a Crown or Hedjet"),"the closed gate was not reported")
+    expect(game:entity(sword.uid) and #game.spawned==0,"the sword was replaced with no crown worn")
+    expect(game:logged("Excalibur gate is closed: no player wears a Crown, Hedjet or Eggplant Crown"),"the closed gate was not reported")
 end,{CHECK_EXCALIBUR_STONE="REWARD_ANKH"})
 
 scenario("Excalibur does nothing outside Tide Pool 4-2",function(game)
