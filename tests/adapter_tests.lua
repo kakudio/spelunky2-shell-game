@@ -596,7 +596,8 @@ scenario("an angry Kali leaves the pet alone until a later calm altar level",fun
     expect(game:entity(cat.uid),"the pet was removed while Kali is angry")
     expect(game:logged("Kali Present swap skipped: Kali is angry"),"the angry skip was not reported")
 
-    game.state.kali_altars_destroyed=0
+    -- The game marks Kali's punishment over with -1, not 0.
+    game.state.kali_altars_destroyed=-1
     game:frames(5)
     expect(game:entity(cat.uid) and #game:spawned_of("ITEM_PRESENT")==0,"calming Kali mid-level swapped the pet")
 
