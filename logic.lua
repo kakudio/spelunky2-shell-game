@@ -3,7 +3,12 @@
 -- validator can be exercised from the in-game console and reviewed in isolation.
 
 local M = {}
-M.LOGIC_VERSION = 26
+M.LOGIC_VERSION = 27
+
+-- Any one of these opens the City of Gold, the Excalibur stone, Osiris and
+-- Anubis II, which reference this table directly. Exactly one is selected per
+-- seed as the guaranteed early crown; the others remain normal pool items.
+M.CROWN_REWARDS={"REWARD_CROWN","REWARD_HEDJET","REWARD_EGGPLANT_CROWN"}
 
 M.LOCATIONS = {
     LOCATION_DWELLING = { parents = {} },
@@ -13,7 +18,7 @@ M.LOCATIONS = {
     LOCATION_TIDE_POOL = { parents = { "LOCATION_OLMEC" } },
     LOCATION_TEMPLE = { parents = { "LOCATION_OLMEC" } },
     LOCATION_ABZU = { parents = { "LOCATION_TIDE_POOL" }, all_of = { "REWARD_ANKH" }, consumes = { "REWARD_ANKH" } },
-    LOCATION_CITY_OF_GOLD = { parents = { "LOCATION_TEMPLE" }, all_of = { "REWARD_SCEPTER" }, any_of = { "REWARD_HEDJET", "REWARD_CROWN" } },
+    LOCATION_CITY_OF_GOLD = { parents = { "LOCATION_TEMPLE" }, all_of = { "REWARD_SCEPTER" }, any_of = M.CROWN_REWARDS },
     LOCATION_DUAT = { parents = { "LOCATION_CITY_OF_GOLD" }, all_of = { "REWARD_ANKH" }, consumes = { "REWARD_ANKH" } },
     LOCATION_ICE_CAVES = { parents = { "LOCATION_TIDE_POOL", "LOCATION_TEMPLE", "LOCATION_ABZU", "LOCATION_DUAT" } },
     LOCATION_NEO_BABYLON = { parents = { "LOCATION_ICE_CAVES" } },
@@ -49,13 +54,13 @@ M.CHECKS = {
     { id="CHECK_OLMEC_ANKH", location="LOCATION_OLMEC", layer="BACKGROUND", base_reward="REWARD_ANKH" },
     { id="CHECK_TUSK_DICE_HOUSE", location="LOCATION_TIDE_POOL", layer="BACKGROUND", base_reward="NONE" },
     { id="CHECK_HUMPHEAD_CAVE_IDOL", location="LOCATION_TIDE_POOL", layer="BACKGROUND", base_reward="REWARD_IDOL" },
-    { id="CHECK_EXCALIBUR_STONE", location="LOCATION_TIDE_POOL", layer="FOREGROUND", any_of={"REWARD_HEDJET","REWARD_CROWN"}, base_reward="REWARD_EXCALIBUR" },
+    { id="CHECK_EXCALIBUR_STONE", location="LOCATION_TIDE_POOL", layer="FOREGROUND", any_of=M.CROWN_REWARDS, base_reward="REWARD_EXCALIBUR" },
     { id="CHECK_TUSK_IDOL", location="LOCATION_TIDE_POOL", layer="BACKGROUND", all_of={"REWARD_SKELETON_KEY"}, base_reward="REWARD_TUSK_IDOL" },
     { id="CHECK_KINGU", location="LOCATION_ABZU", layer="FOREGROUND", all_of={"REWARD_EXCALIBUR"}, base_reward="REWARD_TABLET_OF_DESTINY" },
     { id="CHECK_ANUBIS_SCEPTER", location="LOCATION_TEMPLE", layer="FOREGROUND", base_reward="REWARD_SCEPTER" },
     { id="CHECK_ALIEN_COMPASS", location="LOCATION_TEMPLE", layer="BACKGROUND", all_of={"CHECK_VAN_HORSING_RESCUE","CHECK_VLAD"}, base_reward="REWARD_ALIEN_COMPASS" },
-    { id="CHECK_OSIRIS", location="LOCATION_DUAT", layer="BACKGROUND", all_of={"REWARD_SCEPTER","REWARD_ANKH"}, any_of={"REWARD_HEDJET","REWARD_CROWN"}, base_reward="REWARD_TABLET_OF_DESTINY" },
-    { id="CHECK_ANUBIS_II", location="LOCATION_DUAT", layer="BACKGROUND", all_of={"REWARD_SCEPTER","REWARD_ANKH"}, any_of={"REWARD_HEDJET","REWARD_CROWN"}, base_reward="REWARD_JETPACK" },
+    { id="CHECK_OSIRIS", location="LOCATION_DUAT", layer="BACKGROUND", all_of={"REWARD_SCEPTER","REWARD_ANKH"}, any_of=M.CROWN_REWARDS, base_reward="REWARD_TABLET_OF_DESTINY" },
+    { id="CHECK_ANUBIS_II", location="LOCATION_DUAT", layer="BACKGROUND", all_of={"REWARD_SCEPTER","REWARD_ANKH"}, any_of=M.CROWN_REWARDS, base_reward="REWARD_JETPACK" },
     { id="CHECK_STARS_CHALLENGE_TIDE_POOL", location="LOCATION_TIDE_POOL", layer="BACKGROUND", any_of=M.STARS_MOBILITY_REWARDS, base_reward="REWARD_CLONE_GUN" },
     { id="CHECK_STARS_CHALLENGE_TEMPLE", location="LOCATION_TEMPLE", layer="BACKGROUND", any_of=M.STARS_MOBILITY_REWARDS, base_reward="REWARD_ELIXIR" },
     { id="CHECK_YETI_QUEEN", location="LOCATION_ICE_CAVES", layer="BACKGROUND", base_reward="REWARD_SPIKE_SHOES" },
@@ -145,8 +150,12 @@ M.REWARD_EXCLUDED_CHECKS={
     },
 }
 
-local function is_stars_mobility_reward(value)
-    for _,mobility in ipairs(M.STARS_MOBILITY_REWARDS) do if value==mobility then return true end end
+-- Gates that need any one of a set, with one member guaranteed per seed.
+local ONE_PER_SEED_SETS={M.STARS_MOBILITY_REWARDS,M.CROWN_REWARDS}
+local function is_one_per_seed_reward(value)
+    for _,set in ipairs(ONE_PER_SEED_SETS) do
+        for _,member in ipairs(set) do if value==member then return true end end
+    end
     return false
 end
 
@@ -156,10 +165,10 @@ local function add_group_requirement(deadlines, values, group)
     -- earliest possible placement window.
     local deadline=math.max(1,group-1)
     for _,value in ipairs(values or {}) do
-        -- The Stars gate needs any one mobility reward. Keep its existing
-        -- one-per-seed behavior rather than forcing all of them early merely
-        -- because this summary takes a union of requirement alternatives.
-        if value:sub(1,7)=="REWARD_" and not is_stars_mobility_reward(value) and (not deadlines[value] or deadline<deadlines[value]) then
+        -- The Stars and crown gates need any one member of their set. Keep
+        -- their one-per-seed behavior rather than forcing all of them early
+        -- merely because this summary takes a union of requirement alternatives.
+        if value:sub(1,7)=="REWARD_" and not is_one_per_seed_reward(value) and (not deadlines[value] or deadline<deadlines[value]) then
             deadlines[value]=deadline
         end
     end
@@ -354,6 +363,10 @@ function M.generate(seed)
     -- Stars is a group-3 gate, so its selected mobility reward must be in an
     -- earlier placement group just like the rest of the derived requirements.
     table.insert(keys,{reward=stars_mobility,deadline=2})
+    -- The crown gates open in group 3, so the selected crown likewise
+    -- belongs in group 2 or earlier.
+    local crown=M.CROWN_REWARDS[next_int(#M.CROWN_REWARDS)]
+    table.insert(keys,{reward=crown,deadline=2})
     for reward,window in pairs(M.REWARD_PLACEMENT_WINDOWS) do
         table.insert(keys,{reward=reward,deadline=window.maximum_group,minimum_group=window.minimum_group})
     end
@@ -378,8 +391,8 @@ function M.generate(seed)
             -- Each pass uses each option once, keeping counts within one.
             local function fill_reward(i) return fill_rewards[i] or overflow[((i-#fill_rewards-1)%#overflow)+1] end
             -- A fill reward may be a requirement too (an unpicked Stars
-            -- mobility reward). Swapping checks keeps the same rewards in play
-            -- while keeping each one away from a check it opens.
+            -- mobility reward or crown). Swapping checks keeps the same
+            -- rewards in play while keeping each one away from a check it opens.
             for i=1,#remaining_checks do
                 if reward_is_requirement(check_by_id(remaining_checks[i]),fill_reward(i)) then
                     for k=1,#remaining_checks do
@@ -400,7 +413,7 @@ function M.generate(seed)
         end
         if placed then
             local ok, result=M.validate(map)
-            if ok then result.stars_mobility=stars_mobility; return map, result end
+            if ok then result.stars_mobility=stars_mobility; result.crown=crown; return map, result end
         end
     end
     error("could not construct a valid grouped mapping for seed "..tostring(seed))
@@ -427,6 +440,7 @@ function M.self_test(count, first_seed)
         for _,check in ipairs(M.CHECKS) do if check.shuffle~=false then shuffled_check_count=shuffled_check_count+1 end end
         if entries ~= shuffled_check_count then return false, "wrong shuffled check count at seed "..seed end
         for reward in pairs(M.KEY_REWARD_DEADLINES) do if not seen[reward] then return false, "missing key reward "..reward.." at seed "..seed end end
+        for _,reward in ipairs({route.stars_mobility,route.crown}) do if not seen[reward] then return false, "missing one-per-seed reward "..tostring(reward).." at seed "..seed end end
         local least,most=math.huge,0
         for _,reward in ipairs(M.OVERFLOW_REWARDS) do local count=overflow_counts[reward] or 0; least=math.min(least,count); most=math.max(most,count) end
         if most-least>1 then return false, "unbalanced overflow rewards at seed "..seed end
