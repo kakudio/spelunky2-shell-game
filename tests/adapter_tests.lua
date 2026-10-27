@@ -595,6 +595,53 @@ scenario("Kali's Present is placed on the first altar level with a pet",function
     expect(present.inside==game.ENT_TYPE.ITEM_DIAMOND,"the Present source does not hold a Diamond")
 end,{CHECK_KALI_PRESENT="REWARD_CLONE_GUN"})
 
+-- Destroying an altar angers Kali; the game records it in
+-- `kali_altars_destroyed`, which the swap reads once at level start.
+scenario("an angry Kali leaves the pet alone until a later calm altar level",function(game)
+    game.state.kali_altars_destroyed=1
+    local cat=altar_level(game,2,{{"MONS_PET_CAT",x=5,y=6}})[2]
+    expect(#game:spawned_of("ITEM_PRESENT")==0,"a Present was placed while Kali is angry")
+    expect(game:entity(cat.uid),"the pet was removed while Kali is angry")
+    expect(game:logged("Kali Present swap skipped: Kali is angry"),"the angry skip was not reported")
+
+    -- The game marks Kali's punishment over with -1, not 0.
+    game.state.kali_altars_destroyed=-1
+    game:frames(5)
+    expect(game:entity(cat.uid) and #game:spawned_of("ITEM_PRESENT")==0,"calming Kali mid-level swapped the pet")
+
+    altar_level(game,3)
+    expect(#game:spawned_of("ITEM_PRESENT")==0,"a Present was placed without a pet to replace")
+
+    local dog=altar_level(game,4,{{"MONS_PET_DOG",x=5,y=6}})[2]
+    local present=kali_present(game)
+    expect(present and present.x==5 and present.y==6,"the swap did not resume on the first calm altar level with a pet")
+    expect(not game:entity(dog.uid),"the pet was left beside its Present")
+    expect(present.inside==game.ENT_TYPE.ITEM_DIAMOND,"the Present source does not hold a Diamond")
+end,{CHECK_KALI_PRESENT="REWARD_CLONE_GUN"})
+
+scenario("Kali's Present stays put when she becomes angry after the swap",function(game)
+    altar_level(game,2,{{"MONS_PET_CAT",x=5,y=6}})
+    local present=kali_present(game)
+    expect(present,"no Present was placed while Kali is calm")
+
+    game.state.kali_altars_destroyed=1
+    game:frames(5)
+    expect(game:entity(present.uid),"the Present was removed when Kali became angry")
+    expect(#game:spawned_of("ITEM_PRESENT")==1,"Kali's anger placed another Present")
+
+    -- A save/load reruns level generation on the same level with the
+    -- Present still standing; it is kept whatever her mood.
+    game:fire(ON.POST_LEVEL_GENERATION)
+    game:frames(1)
+    expect(game:entity(present.uid),"a same-level reload discarded the Present while Kali is angry")
+    expect(#game:spawned_of("ITEM_PRESENT")==1,"a same-level reload placed another Present")
+    expect(not game:logged("Kali Present swap skipped"),"a same-level reload reported an angry skip")
+
+    local eggplant=sacrifice(game,present)
+    game:frames(1)
+    expect(not game:entity(eggplant) and #game:spawned_of("ITEM_CLONEGUN")==1,"the Present's reward was not delivered after Kali became angry")
+end,{CHECK_KALI_PRESENT="REWARD_CLONE_GUN"})
+
 scenario("sacrificing Kali's Present delivers the mapped reward once per run",function(game)
     altar_level(game,2,{{"MONS_PET_CAT",x=5,y=6}})
     local eggplant=sacrifice(game,kali_present(game))
