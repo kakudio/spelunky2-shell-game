@@ -9,16 +9,8 @@ local M={}
 local materialize=adapters.materialize
 local replace_native_spawn=adapters.replace_native_spawn
 
--- A Crown, Hedjet or Eggplant Crown a player wears is a powerup, not an
--- inventory item. Any one opens Excalibur's gate. The labels name them in the
--- gate's log lines, so the gate and its logging read the same list.
-local EXCALIBUR_GATE_POWERUPS={
-    {name="ITEM_POWERUP_CROWN",label="Crown"},
-    {name="ITEM_POWERUP_HEDJET",label="Hedjet"},
-    {name="ITEM_POWERUP_EGGPLANTCROWN",label="Eggplant Crown"},
-}
-local EXCALIBUR_GATE={}
-for _,powerup in ipairs(EXCALIBUR_GATE_POWERUPS) do EXCALIBUR_GATE[#EXCALIBUR_GATE+1]=powerup.name end
+-- A Hedjet or Crown a player wears is a powerup, not an inventory item.
+local EXCALIBUR_GATE={"ITEM_POWERUP_HEDJET","ITEM_POWERUP_CROWN"}
 
 local ITEM_ANCHORS={
     -- The Black Market Hedjet is handled once the shop room and its owner are
@@ -648,7 +640,7 @@ local function in_excalibur_level(ctx)
 end
 
 -- The sword-in-stone can appear after POST_LEVEL_GENERATION, while a test
--- Eggplant Crown is granted at START. Check both conditions here rather than deciding
+-- Crown is granted at START. Check both conditions here rather than deciding
 -- while the room is still being assembled.
 function M.replace_excalibur_if_gated(ctx, attempt)
     -- Excalibur's stone only exists in Tide Pool 4-2. Restricting this avoids
@@ -661,22 +653,17 @@ function M.replace_excalibur_if_gated(ctx, attempt)
         ctx.lifecycle:leave_native("CHECK_EXCALIBUR_STONE","maps to its native reward "..EXCALIBUR_BASE_REWARD.."; left native")
         return
     end
-    local worn,labels,any_worn={},{},false
-    for _,powerup in ipairs(EXCALIBUR_GATE_POWERUPS) do
-        local wearing=players_wear_any({powerup.name})
-        any_worn=any_worn or wearing
-        worn[#worn+1]=powerup.label.."="..tostring(wearing)
-        labels[#labels+1]=powerup.label
-    end
-    if not any_worn then
-        if not ctx.excalibur_gate_closed then ctx.log("Excalibur gate is closed: no player wears a "..table.concat(labels,", ",1,#labels-1).." or "..labels[#labels]) end
+    local has_crown=players_wear_any({"ITEM_POWERUP_CROWN"})
+    local has_hedjet=players_wear_any({"ITEM_POWERUP_HEDJET"})
+    if not (has_crown or has_hedjet) then
+        if not ctx.excalibur_gate_closed then ctx.log("Excalibur gate is closed: no player wears a Crown or Hedjet") end
         ctx.excalibur_gate_closed=true
         return
     end
     ctx.excalibur_gate_closed=false
     local excalibur_type=placements.type_of("ITEM_EXCALIBUR")
     local swords=excalibur_type and get_entities_by_type(excalibur_type) or {}
-    ctx.log(string.format("Excalibur gate is open (%s); found %d sword-in-stone entities",table.concat(worn,", "),#swords))
+    ctx.log(string.format("Excalibur gate is open (Crown=%s Hedjet=%s); found %d sword-in-stone entities",tostring(has_crown),tostring(has_hedjet),#swords))
     for _,uid in ipairs(swords) do
         local sword=get_entity(uid)
         if sword then
@@ -1424,7 +1411,7 @@ function M.register_spawn_hooks(ctx)
         ctx.kali_known_items=current_items
     end,ON.FRAME)
 
-    -- A Crown, Hedjet or Eggplant Crown first worn partway through 4-2 opens the gate there.
+    -- A Hedjet or Crown first worn partway through 4-2 opens the gate there.
     set_callback(function()
         if ctx.excalibur_gate_closed and in_excalibur_level(ctx) and players_wear_any(EXCALIBUR_GATE) then
             M.replace_excalibur_if_gated(ctx)

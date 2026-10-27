@@ -161,7 +161,9 @@ end
 local function crown_tests()
     local crowns={}
     for _,reward in ipairs(logic.CROWN_REWARDS) do crowns[reward]=true end
-    if not crowns.REWARD_EGGPLANT_CROWN then return false,"Eggplant Crown is not a crown" end
+    if not (crowns.REWARD_CROWN and crowns.REWARD_HEDJET) or #logic.CROWN_REWARDS~=2 then
+        return false,"the crowns should be exactly the Crown and Hedjet"
+    end
     if logic.LOCATIONS.LOCATION_CITY_OF_GOLD.any_of~=logic.CROWN_REWARDS then
         return false,"City of Gold does not require the shared crown list"
     end
@@ -174,8 +176,8 @@ local function crown_tests()
             return false,gate.." does not require the shared crown list"
         end
     end
-    -- Every crown is picked as the guaranteed item somewhere, placed early,
-    -- and no crown is ever placed at a gate it opens.
+    -- Both crowns are picked as the guaranteed item somewhere, placed early,
+    -- and neither is ever placed at a gate it opens.
     local picked={}
     for seed=1,200 do
         local map,route=logic.generate(seed)
@@ -192,20 +194,20 @@ local function crown_tests()
         if not picked[reward] then return false,reward.." was never the guaranteed crown" end
     end
     -- Vanilla rewards with the Crown and Hedjet removed and the Eggplant Crown
-    -- moved to the Dwelling, where every route has it: every crown gate is
-    -- reachable. Without it, none is.
+    -- moved to the Dwelling, where every route has it: no crown gate is
+    -- reachable. A Crown in the same place opens every one of them.
     local map={}
     for _,check in ipairs(logic.CHECKS) do map[check.id]=check.base_reward end
     map.CHECK_BLACK_MARKET="NONE"; map.CHECK_VLADS_CASTLE="NONE"; map.CHECK_EGGPLANT_KING="NONE"
     map.CHECK_YANG="REWARD_EGGPLANT_CROWN"
     local reached=crown_gates_reached(map)
     for _,gate in ipairs(CROWN_GATES) do
-        if not reached[gate] then return false,"Eggplant Crown alone did not open "..gate end
+        if reached[gate] then return false,"Eggplant Crown alone opened "..gate end
     end
-    map.CHECK_YANG="NONE"
+    map.CHECK_YANG="REWARD_CROWN"
     reached=crown_gates_reached(map)
     for _,gate in ipairs(CROWN_GATES) do
-        if reached[gate] then return false,gate.." opened with no crown" end
+        if not reached[gate] then return false,"Crown alone did not open "..gate end
     end
     return true
 end

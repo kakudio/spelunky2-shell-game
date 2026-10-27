@@ -5,10 +5,10 @@
 local M = {}
 M.LOGIC_VERSION = 27
 
--- Any one of these opens the City of Gold, the Excalibur stone, Osiris and
+-- Either of these opens the City of Gold, the Excalibur stone, Osiris and
 -- Anubis II, which reference this table directly. Exactly one is selected per
--- seed as the guaranteed early crown; the others remain normal pool items.
-M.CROWN_REWARDS={"REWARD_CROWN","REWARD_HEDJET","REWARD_EGGPLANT_CROWN"}
+-- seed as the guaranteed early crown; the other remains a normal pool item.
+M.CROWN_REWARDS={"REWARD_CROWN","REWARD_HEDJET"}
 
 M.LOCATIONS = {
     LOCATION_DWELLING = { parents = {} },

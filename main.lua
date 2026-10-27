@@ -269,7 +269,7 @@ set_callback(function()
             -- hooks (the Udjat hook would otherwise turn this Eye into its mapped reward).
             grant_test_item(player,ENT_TYPE.ITEM_PICKUP_UDJATEYE,"Udjat Eye")
             grant_test_item(player,ENT_TYPE.ITEM_PICKUP_ANKH,"Ankh")
-            grant_test_powerup(player,ENT_TYPE.ITEM_POWERUP_EGGPLANTCROWN,"Eggplant Crown")
+            grant_test_powerup(player,ENT_TYPE.ITEM_POWERUP_CROWN,"Crown")
             grant_test_item(player,ENT_TYPE.ITEM_PICKUP_SKELETON_KEY,"Skeleton Key")
             grant_test_item(player,ENT_TYPE.ITEM_PICKUP_SPECIALCOMPASS,"Alien Compass")
             grant_test_floor_item(player,ENT_TYPE.ITEM_PICKUP_TABLETOFDESTINY,"Tablet of Destiny")
@@ -282,7 +282,7 @@ set_callback(function()
             grant_test_tusk_idol(player)
             grant_test_floor_item(player,placements.type_of("ITEM_EGGPLANT"),"Eggplant")
         end
-        log("Test resources granted: $1,000,000, 50 health/bombs/ropes, Udjat Eye, Ankh, Eggplant Crown, Skeleton Key, Alien Compass, Tablet of Destiny, Spike Shoes, Excalibur, Vlad's Cape, and a Scepter, Tusk Idol, and Eggplant at each player's position")
+        log("Test resources granted: $1,000,000, 50 health/bombs/ropes, Udjat Eye, Ankh, Crown, Skeleton Key, Alien Compass, Tablet of Destiny, Spike Shoes, Excalibur, Vlad's Cape, and a Scepter, Tusk Idol, and Eggplant at each player's position")
     end
     checks.replace_excalibur_if_gated(runtime_context)
 end,ON.START)

@@ -34,7 +34,6 @@ This mod randomizes the locations of key progression items in Spelunky 2, forcin
 - **Ankh** - Required for City of Gold, Duat, Hundun
 - **Crown** - Required for Excalibur, City of Gold, Kingu, Tiamat
 - **Hedjet** - Required for Excalibur, City of Gold
-- **Eggplant Crown** - Opens the same gates as the Crown and Hedjet; any one of the three suffices
 - **Udjat Eye** - Required for Black Market, City of Gold
 - **Skeleton Key** - Opens locked doors, City of Gold door
 
