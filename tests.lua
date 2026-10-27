@@ -27,8 +27,7 @@ end
 
 local function mapping_tests()
     local expected_deadlines={
-        REWARD_UDJAT_EYE=1, REWARD_CROWN=2, REWARD_HEDJET=2,
-        REWARD_SKELETON_KEY=2, REWARD_ANKH=3, REWARD_EXCALIBUR=3,
+        REWARD_UDJAT_EYE=1, REWARD_SKELETON_KEY=2, REWARD_ANKH=3, REWARD_EXCALIBUR=3,
         REWARD_SCEPTER=3, REWARD_ALIEN_COMPASS=4, REWARD_EGGPLANT=4,
         REWARD_TABLET_OF_DESTINY=5, REWARD_HOU_YIS_BOW=7,
         REWARD_ARROW_OF_LIGHT=7,
@@ -41,6 +40,11 @@ local function mapping_tests()
     for _,reward in ipairs(logic.STARS_MOBILITY_REWARDS) do
         if logic.KEY_REWARD_DEADLINES[reward] then
             return false,"Stars mobility should remain one-per-seed: "..reward
+        end
+    end
+    for _,reward in ipairs(logic.CROWN_REWARDS) do
+        if logic.KEY_REWARD_DEADLINES[reward] then
+            return false,"Crowns should remain one-per-seed: "..reward
         end
     end
     for _,seed in ipairs({1,42,867530,999999}) do
@@ -138,6 +142,76 @@ local function stars_tests()
     return true
 end
 
+local CROWN_GATES={"LOCATION_CITY_OF_GOLD","CHECK_EXCALIBUR_STONE","CHECK_OSIRIS","CHECK_ANUBIS_II"}
+
+-- Which crown gates any route reaches under this mapping.
+local function crown_gates_reached(map)
+    local reached={}
+    for _,early in ipairs({"LOCATION_JUNGLE","LOCATION_VOLCANA"}) do
+        for _,mid in ipairs({"LOCATION_TIDE_POOL","LOCATION_TEMPLE"}) do
+            local result=logic.solve(map,{early=early,mid=mid})
+            for _,gate in ipairs(CROWN_GATES) do
+                if result.entered[gate] or result.visited[gate] then reached[gate]=true end
+            end
+        end
+    end
+    return reached
+end
+
+local function crown_tests()
+    local crowns={}
+    for _,reward in ipairs(logic.CROWN_REWARDS) do crowns[reward]=true end
+    if not (crowns.REWARD_CROWN and crowns.REWARD_HEDJET) or #logic.CROWN_REWARDS~=2 then
+        return false,"the crowns should be exactly the Crown and Hedjet"
+    end
+    if logic.LOCATIONS.LOCATION_CITY_OF_GOLD.any_of~=logic.CROWN_REWARDS then
+        return false,"City of Gold does not require the shared crown list"
+    end
+    local gated_checks={}
+    for _,check in ipairs(logic.CHECKS) do
+        if check.any_of==logic.CROWN_REWARDS then gated_checks[check.id]=true end
+    end
+    for _,gate in ipairs(CROWN_GATES) do
+        if gate:sub(1,6)=="CHECK_" and not gated_checks[gate] then
+            return false,gate.." does not require the shared crown list"
+        end
+    end
+    -- Both crowns are picked as the guaranteed item somewhere, placed early,
+    -- and neither is ever placed at a gate it opens.
+    local picked={}
+    for seed=1,200 do
+        local map,route=logic.generate(seed)
+        local pick=route.crown
+        if not crowns[pick] then return false,"no guaranteed crown at seed "..seed end
+        picked[pick]=true
+        for check_id,reward in pairs(map) do
+            if gated_checks[check_id] and crowns[reward] then return false,reward.." placed at "..check_id.." at seed "..seed end
+            if reward==pick and logic.check_group(check_id,seed)>2 then return false,pick.." not placed early at seed "..seed end
+        end
+        if not route.victory then return false,"no Cosmic Ocean route at seed "..seed end
+    end
+    for reward in pairs(crowns) do
+        if not picked[reward] then return false,reward.." was never the guaranteed crown" end
+    end
+    -- Vanilla rewards with the Crown and Hedjet removed and the Eggplant Crown
+    -- moved to the Dwelling, where every route has it: no crown gate is
+    -- reachable. A Crown in the same place opens every one of them.
+    local map={}
+    for _,check in ipairs(logic.CHECKS) do map[check.id]=check.base_reward end
+    map.CHECK_BLACK_MARKET="NONE"; map.CHECK_VLADS_CASTLE="NONE"; map.CHECK_EGGPLANT_KING="NONE"
+    map.CHECK_YANG="REWARD_EGGPLANT_CROWN"
+    local reached=crown_gates_reached(map)
+    for _,gate in ipairs(CROWN_GATES) do
+        if reached[gate] then return false,"Eggplant Crown alone opened "..gate end
+    end
+    map.CHECK_YANG="REWARD_CROWN"
+    reached=crown_gates_reached(map)
+    for _,gate in ipairs(CROWN_GATES) do
+        if not reached[gate] then return false,"Crown alone did not open "..gate end
+    end
+    return true
+end
+
 local function lifecycle_tests()
     local messages={}
     local scheduled=nil
@@ -169,6 +243,8 @@ function M.run(fuzz_count)
     if not ok then return false,"mapping: "..message end
     ok,message=stars_tests()
     if not ok then return false,"stars: "..message end
+    ok,message=crown_tests()
+    if not ok then return false,"crowns: "..message end
     ok,message=lifecycle_tests()
     if not ok then return false,"lifecycle: "..message end
     return logic.self_test(fuzz_count or 100,1)

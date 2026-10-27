@@ -308,6 +308,14 @@ scenario("Excalibur's gate stays closed unless a player wears a Crown or Hedjet"
     expect(game:logged("Excalibur gate is closed: no player wears a Crown or Hedjet"),"the closed gate was not reported")
 end,{CHECK_EXCALIBUR_STONE="REWARD_ANKH"})
 
+scenario("Excalibur's gate stays closed when a player wears only an Eggplant Crown",function(game)
+    game:wear(game:add_player{x=1,y=1},"ITEM_POWERUP_EGGPLANTCROWN")
+    local sword=excalibur_level(game)[1]
+    game:frames(200)
+    expect(game:entity(sword.uid) and #game.spawned==0,"the sword was replaced for a worn Eggplant Crown")
+    expect(game:logged("Excalibur gate is closed: no player wears a Crown or Hedjet"),"the closed gate was not reported")
+end,{CHECK_EXCALIBUR_STONE="REWARD_ANKH"})
+
 scenario("Excalibur does nothing outside Tide Pool 4-2",function(game)
     game:wear(game:add_player{x=1,y=1},"ITEM_POWERUP_CROWN")
     for _,level in ipairs({1,3}) do
