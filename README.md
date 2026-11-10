@@ -90,14 +90,17 @@ Access options via Modlunky 2's options menu or Overlunky (F8) → Options:
 
 ## Reporting an Issue
 
+To report a problem, use the Kakudio website's
+[bug-reporting page](https://kakudio.github.io/bug-report/).
+
 Leave **Generate Spoiler** and **Generate Logs** enabled. At the start of every
 run, the mod writes one report to the `run_reports/` folder in its data folder;
 for an install extracted from `ShellGame.zip`, that is
 `Mods/Data/ShellGame/run_reports/`.
 Either option can create that same file, containing its enabled section(s).
-Attach the newest `.txt` file when reporting a problem; with both enabled, it
-includes the randomizer seed, the game adventure seed, the full spoiler mapping,
-and all Shell Game logs.
+The newest `.txt` file there is the one to send with your report; with both
+enabled, it includes the randomizer seed, the game adventure seed, the full
+spoiler mapping, and all Shell Game logs.
 Use `kir_report_path()` in the Overlunky console to print the current report's
 location. The mod retains the newest 30 reports and deletes older reports
 automatically.
