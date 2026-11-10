@@ -430,6 +430,13 @@ local function place_kali_present_source(ctx)
     end
     local altars=get_entities_by_type(altar_type)
     if #altars==0 then return end
+    -- Kali's mood is read once, here. Destroying an altar angers her and
+    -- chains the player to her punish ball; while she is angry no pet is
+    -- touched and nothing is claimed, so the next altar level tries again.
+    if (state.kali_altars_destroyed or 0)>0 then
+        ctx.log("Kali Present swap skipped: Kali is angry; will try the next eligible level")
+        return
+    end
     -- The source is deliberately created in the same level as the first Kali
     -- altar the run encounters. Presents are dropped at exits, so making it a
     -- shuffled reward elsewhere could make this check impossible to reach.

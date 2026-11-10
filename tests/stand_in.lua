@@ -76,7 +76,7 @@ function M.new(config)
     },Game)
     game.state={
         theme=config.theme or M.THEME.DWELLING, world=config.world or 1, level=config.level or 1,
-        theme_next=0, quests={}, logic={}, kali_gifts=0, kali_favor=0, room_owners={owned_items={}},
+        theme_next=0, quests={}, logic={}, kali_gifts=0, kali_favor=0, kali_altars_destroyed=0, room_owners={owned_items={}},
     }
     game.ENT_TYPE=numbered(1000)
     for _,name in ipairs(config.missing_types or {}) do rawset(game.ENT_TYPE,name,false) end
